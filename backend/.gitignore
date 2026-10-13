@@ -52,4 +52,7 @@ build/
 .DS_Store
 Thumbs.db
 
+#other
+TreeStructure.txt
+
 
