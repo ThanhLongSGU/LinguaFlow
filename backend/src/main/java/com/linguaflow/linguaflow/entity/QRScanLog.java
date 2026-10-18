@@ -1,20 +1,7 @@
 package com.linguaflow.linguaflow.entity;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.Table;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.EqualsAndHashCode;
-import lombok.NoArgsConstructor;
-import lombok.ToString;
+import jakarta.persistence.*;
+import lombok.*;
 
 import java.time.LocalDateTime;
 
@@ -31,12 +18,27 @@ public class QRScanLog {
     @Column(name = "ScanId")
     private Long scanId;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "QrId", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "QrId", nullable = false, insertable = false, updatable = false)
     @ToString.Exclude
     @EqualsAndHashCode.Exclude
     private QRCode qrCode;
 
+    @Column(name = "QrId", nullable = false)
+    private Integer qrId;
+
     @Column(name = "ScannedAt", nullable = false)
-    private LocalDateTime scannedAt;
+    @Builder.Default
+    private LocalDateTime scannedAt = LocalDateTime.now();
+
+    public Integer getQrId() {
+        if (this.qrId != null) {
+            return this.qrId;
+        }
+        return this.qrCode != null ? this.qrCode.getQrId() : null;
+    }
+
+    public void setQrId(Integer qrId) {
+        this.qrId = qrId;
+    }
 }

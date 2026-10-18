@@ -1,20 +1,9 @@
 package com.linguaflow.linguaflow.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.OneToMany;
-import jakarta.persistence.Table;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.EqualsAndHashCode;
-import lombok.NoArgsConstructor;
-import lombok.ToString;
+import jakarta.persistence.*;
+import lombok.*;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -44,7 +33,8 @@ public class User {
     private String role;
 
     @Column(name = "IsActive", nullable = false)
-    private Boolean active;
+    @Builder.Default
+    private Boolean isActive = true;
 
     @OneToMany(mappedBy = "createdBy", fetch = FetchType.LAZY)
     @JsonIgnore
@@ -52,4 +42,12 @@ public class User {
     @EqualsAndHashCode.Exclude
     @Builder.Default
     private List<TouristSite> createdSites = new ArrayList<>();
+
+    public Boolean getIsActive() {
+        return isActive;
+    }
+
+    public void setIsActive(Boolean isActive) {
+        this.isActive = isActive;
+    }
 }

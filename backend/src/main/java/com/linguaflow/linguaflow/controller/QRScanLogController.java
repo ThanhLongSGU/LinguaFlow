@@ -18,6 +18,7 @@ public class QRScanLogController {
 
     private final QRScanLogService qrScanLogService;
 
+
     @PostMapping
     public ResponseEntity<QRScanLogDTO> recordScanLog(@RequestBody QRScanLogDTO scanLogDTO) {
         QRScanLogDTO createdLog = qrScanLogService.recordScanLog(scanLogDTO.getQrId());
