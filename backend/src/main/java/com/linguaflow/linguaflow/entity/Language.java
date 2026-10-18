@@ -32,7 +32,7 @@ public class Language {
     @Column(name = "LanguageId")
     private Integer languageId;
 
-    @Column(name = "Code", nullable = false, unique = true, length = 10)
+    @Column(name = "Code", nullable = false, unique = true, length = 10, columnDefinition = "VARCHAR(10)")
     private String code;
 
     @Column(name = "Name", nullable = false, length = 50)
@@ -47,4 +47,11 @@ public class Language {
     @EqualsAndHashCode.Exclude
     @Builder.Default
     private List<Translation> translations = new ArrayList<>();
+
+    @OneToMany(mappedBy = "language", fetch = FetchType.LAZY)
+    @JsonIgnore
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    @Builder.Default
+    private List<AiTranslationTask> aiTranslationTasks = new ArrayList<>();
 }

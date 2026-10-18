@@ -46,13 +46,15 @@ public class Narration {
     @Column(name = "Title", nullable = false, length = 200)
     private String title;
 
+    @Column(name = "OriginalContent", columnDefinition = "NVARCHAR(MAX)")
+    private String originalContent;
+
+    @Column(name = "ContentHash", columnDefinition = "VARCHAR(64)")
+    private String contentHash;
+
     @CreationTimestamp
     @Column(name = "CreatedAt", nullable = false, updatable = false)
     private LocalDateTime createdAt;
-
-    @UpdateTimestamp
-    @Column(name = "UpdatedAt")
-    private LocalDateTime updatedAt;
 
     @OneToMany(mappedBy = "narration", fetch = FetchType.LAZY)
     @JsonIgnore
@@ -60,4 +62,11 @@ public class Narration {
     @EqualsAndHashCode.Exclude
     @Builder.Default
     private List<Translation> translations = new ArrayList<>();
+
+    @OneToMany(mappedBy = "narration", fetch = FetchType.LAZY)
+    @JsonIgnore
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    @Builder.Default
+    private List<AiTranslationTask> aiTranslationTasks = new ArrayList<>();
 }
