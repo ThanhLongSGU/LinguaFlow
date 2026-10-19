@@ -14,4 +14,5 @@ public class NarrationDTO {
     private Integer narrationId;
     private Integer siteId;
     private String title;
+    private String originalContent;
 }
