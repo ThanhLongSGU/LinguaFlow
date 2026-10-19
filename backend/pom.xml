@@ -33,7 +33,7 @@
             <artifactId>spring-boot-starter-webmvc</artifactId>
         </dependency>
 
-        <!-- Spring Security (Dùng bảo mật các endpoint Admin/UC08) -->
+        <!-- Spring Security  -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-security</artifactId>
