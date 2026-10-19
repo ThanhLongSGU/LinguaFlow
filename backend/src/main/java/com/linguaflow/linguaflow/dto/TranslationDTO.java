@@ -14,6 +14,8 @@ public class TranslationDTO {
     private Integer translationId;
     private Integer narrationId;
     private Integer languageId;
+    private String languageCode;
+    private String languageName;
     private String content;
     private String audioUrl;
 }
