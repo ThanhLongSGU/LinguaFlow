@@ -11,4 +11,6 @@ public interface QRCodeRepository extends JpaRepository<QRCode, Integer> {
 
     @Query("SELECT q FROM QRCode q JOIN FETCH q.touristSite WHERE q.qrCodeValue = :qrCodeValue")
     Optional<QRCode> findByQrCodeValue(@Param("qrCodeValue") String qrCodeValue);
+
+    boolean existsByTouristSite_SiteId(Integer siteId);
 }

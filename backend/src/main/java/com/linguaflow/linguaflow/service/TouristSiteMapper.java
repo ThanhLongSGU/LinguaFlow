@@ -2,6 +2,7 @@ package com.linguaflow.linguaflow.service;
 
 import com.linguaflow.linguaflow.dto.TranslationDTO;
 import com.linguaflow.linguaflow.dto.TouristSiteDetailResponse;
+import com.linguaflow.linguaflow.dto.TouristSiteDTO;
 import com.linguaflow.linguaflow.entity.Narration;
 import com.linguaflow.linguaflow.entity.TouristSite;
 import com.linguaflow.linguaflow.entity.Translation;
@@ -12,6 +13,8 @@ import java.util.List;
 
 @Mapper(componentModel = "spring")
 public interface TouristSiteMapper {
+
+    TouristSiteDTO toDto(TouristSite touristSite);
 
     @Mapping(target = "translations", ignore = true)
     TouristSiteDetailResponse toBaseDetailResponse(TouristSite touristSite);
