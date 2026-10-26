@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { MapPin, Globe, Headphones, Clock, Ticket } from "lucide-react";
+import { MapPin, Globe, Headphones, Map } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 // Cấu trúc dữ liệu cho một Điểm đến (POI)
 interface POI {
@@ -123,12 +124,13 @@ const POI_LIST: POI[] = [
 ];
 
 export const VisitorPage: React.FC = () => {
+  const navigate = useNavigate();
   const [selectedLanguage, setSelectedLanguage] = useState("vi");
   const [activePoi, setActivePoi] = useState<POI>(POI_LIST[0]);
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans pb-24">
-      {/* Header nhiều màu sắc và chọn ngôn ngữ */}
+      {/* Header điều hướng & chọn ngôn ngữ */}
       <header className="bg-white sticky top-0 z-20 px-5 py-4 shadow-sm flex justify-between items-center border-b border-slate-100">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center text-white font-black text-xl shadow-lg shadow-blue-200">
@@ -144,18 +146,31 @@ export const VisitorPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex items-center gap-2 bg-slate-100/80 hover:bg-slate-200 transition-colors px-3 py-2 rounded-xl">
-          <Globe className="w-4 h-4 text-slate-600" />
-          <select
-            value={selectedLanguage}
-            onChange={(e) => setSelectedLanguage(e.target.value)}
-            className="bg-transparent text-sm font-semibold text-slate-700 outline-none cursor-pointer appearance-none pr-2"
+        {/* Cụm nút chuyển Bản đồ & Chọn Ngôn ngữ */}
+        <div className="flex items-center gap-2">
+          {/* NÚT CHUYỂN ĐỔI SANG BẢN ĐỒ GPS */}
+          <button
+            onClick={() => navigate("/map")}
+            className="flex items-center gap-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 font-bold text-xs px-3 py-2 rounded-xl border border-blue-200 transition-colors shadow-sm"
           >
-            <option value="vi">🇻🇳 Tiếng Việt</option>
-            <option value="en">EN English</option>
-            <option value="ja">🇯🇵 日本語</option>
-            <option value="kr">kr 한국</option>
-          </select>
+            <Map className="w-4 h-4 text-blue-600" />
+            Bản đồ
+          </button>
+
+          {/* Chọn ngôn ngữ */}
+          <div className="flex items-center gap-1 bg-slate-100/80 hover:bg-slate-200 transition-colors px-2.5 py-2 rounded-xl">
+            <Globe className="w-4 h-4 text-slate-600" />
+            <select
+              value={selectedLanguage}
+              onChange={(e) => setSelectedLanguage(e.target.value)}
+              className="bg-transparent text-xs font-semibold text-slate-700 outline-none cursor-pointer appearance-none pr-1"
+            >
+              <option value="vi">🇻🇳 Tiếng Việt</option>
+              <option value="en">🇬🇧 English</option>
+              <option value="ja">🇯🇵 日本語</option>
+              <option value="kr">🇰🇷 한국어</option>
+            </select>
+          </div>
         </div>
       </header>
 
@@ -209,7 +224,11 @@ export const VisitorPage: React.FC = () => {
               <div
                 key={poi.id}
                 onClick={() => setActivePoi(poi)}
-                className={`snap-start shrink-0 w-64 bg-white rounded-2xl p-3 cursor-pointer transition-all border-2 ${activePoi.id === poi.id ? "border-blue-500 shadow-md shadow-blue-100" : "border-transparent shadow-sm hover:shadow-md"}`}
+                className={`snap-start shrink-0 w-64 bg-white rounded-2xl p-3 cursor-pointer transition-all border-2 ${
+                  activePoi.id === poi.id
+                    ? "border-blue-500 shadow-md shadow-blue-100"
+                    : "border-transparent shadow-sm hover:shadow-md"
+                }`}
               >
                 <img
                   src={poi.imageUrl}
