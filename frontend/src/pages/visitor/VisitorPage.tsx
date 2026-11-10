@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { getTouristSiteByQr, resolveAssetUrl, type TouristSiteDetail, type TranslationItem } from "../../services/api";
 
 function VisitorPage() {
@@ -73,6 +73,9 @@ function VisitorPage() {
           L
         </span>
         <span className="brand-name">LinguaFlow</span>
+        <Link className="map-nav-link" to="/map">
+          Bản đồ GPS
+        </Link>
         <span className="topbar-note">AUDIO GUIDE</span>
       </header>
 

@@ -52,6 +52,16 @@ public class TouristSite {
     @Column(name = "City", length = 100)
     private String city;
 
+    @Column(name = "Latitude", precision = 10, scale = 7)
+    private BigDecimal latitude;
+
+    @Column(name = "Longitude", precision = 10, scale = 7)
+    private BigDecimal longitude;
+
+    @Builder.Default
+    @Column(name = "TriggerRadius", nullable = false)
+    private Integer triggerRadius = 20;
+
     @Column(name = "ImageUrl", length = 500)
     private String imageUrl;
 
