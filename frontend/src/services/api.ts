@@ -17,6 +17,29 @@ export interface TouristSiteDetail {
   availableTranslations: TranslationItem[];
 }
 
+export interface PoiTranslation {
+  languageCode: string;
+  audioUrl: string;
+}
+
+export interface PoiOfflineData {
+  siteId: number;
+  name: string;
+  address: string;
+  description: string;
+  latitude: number;
+  longitude: number;
+  triggerRadius: number;
+  imageUrl: string;
+  translations: PoiTranslation[];
+}
+
+export interface PoiSyncResponse {
+  serverDataVersion: number;
+  isUpdated: boolean;
+  poiList: PoiOfflineData[];
+}
+
 export async function getTouristSiteByQr(qrCodeValue: string, signal?: AbortSignal): Promise<TouristSiteDetail> {
   const response = await fetch(`${apiBaseURL}/tourist-sites/qr/${encodeURIComponent(qrCodeValue)}`, { signal });
 
@@ -29,6 +52,19 @@ export async function getTouristSiteByQr(qrCodeValue: string, signal?: AbortSign
   }
 
   return (await response.json()) as TouristSiteDetail;
+}
+
+// Hàm này sẽ dùng để tải toàn bộ POI về một lần (offline mode)
+export async function syncPoiData(clientVersion: number = 0, signal?: AbortSignal): Promise<PoiSyncResponse | null> {
+  const response = await fetch(`${apiBaseURL}/sync/poi?clientVersion=${encodeURIComponent(clientVersion)}`, { signal });
+
+  if (response.status === 304) return null;
+
+  if (!response.ok) {
+    throw new Error(`Không thể đồng bộ địa điểm (HTTP ${response.status}).`);
+  }
+
+  return (await response.json()) as PoiSyncResponse;
 }
 
 export function resolveAssetUrl(path: string): string {
