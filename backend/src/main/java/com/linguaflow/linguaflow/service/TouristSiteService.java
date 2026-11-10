@@ -23,98 +23,116 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class TouristSiteService {
 
-    private final QRCodeRepository qrCodeRepository;
-    private final TouristSiteRepository touristSiteRepository;
-    private final TouristSiteMapper touristSiteMapper;
-    private final CategoryRepository categoryRepository;
-    private final NarrationRepository narrationRepository;
-    private final UserRepository userRepository;
+        private final QRCodeRepository qrCodeRepository;
+        private final TouristSiteRepository touristSiteRepository;
+        private final TouristSiteMapper touristSiteMapper;
+        private final CategoryRepository categoryRepository;
+        private final NarrationRepository narrationRepository;
+        private final UserRepository userRepository;
 
-    @Transactional(readOnly = true)
-    @Cacheable(value = "qr_sites", key = "#qrCodeValue")
-    public TouristSiteDetailResponse getSiteDetailByQrCode(String qrCodeValue) {
-        QRCode qrCode = qrCodeRepository.findByQrCodeValue(qrCodeValue)
-                .filter(code -> Boolean.TRUE.equals(code.getActive()))
-                .orElseThrow(() -> new EntityNotFoundException("Mã QR không hợp lệ"));
+        @Transactional(readOnly = true)
+        @Cacheable(value = "qr_sites", key = "#qrCodeValue")
+        public TouristSiteDetailResponse getSiteDetailByQrCode(String qrCodeValue) {
+                QRCode qrCode = qrCodeRepository.findByQrCodeValue(qrCodeValue)
+                                .filter(code -> Boolean.TRUE.equals(code.getActive()))
+                                .orElseThrow(() -> new EntityNotFoundException("Mã QR không hợp lệ"));
 
-        Integer siteId = qrCode.getTouristSite().getSiteId();
-        TouristSite touristSite = touristSiteRepository.findByIdWithTranslations(siteId)
-                .orElseThrow(() -> new EntityNotFoundException(
-                        "Tourist site not found with id: " + siteId));
+                Integer siteId = qrCode.getTouristSite().getSiteId();
+                TouristSite touristSite = touristSiteRepository.findByIdWithTranslations(siteId)
+                                .orElseThrow(() -> new EntityNotFoundException(
+                                                "Tourist site not found with id: " + siteId));
 
-        return touristSiteMapper.toDetailResponse(touristSite);
-    }
-
-    @Transactional
-    @CacheEvict(value = "qr_sites", allEntries = true)
-    public TouristSiteDTO createTouristSite(CreateTouristSiteRequest request) {
-        validateTicketPrice(request);
-
-        Category category = categoryRepository.findById(request.categoryId())
-                .orElseThrow(() -> new EntityNotFoundException(
-                        "Category not found with id: " + request.categoryId()));
-        User createdBy = userRepository.findById(1)
-                .orElseThrow(() -> new EntityNotFoundException("Default user not found"));
-
-        TouristSite touristSite = TouristSite.builder()
-                .name(request.name())
-                .category(category)
-                .description(request.description())
-                .address(request.address())
-                .city(request.city())
-                .imageUrl(request.imageUrl())
-                .referenceTicketPrice(request.referenceTicketPrice())
-                .status(request.isActive())
-                .createdBy(createdBy)
-                .build();
-
-        return touristSiteMapper.toDto(touristSiteRepository.save(touristSite));
-    }
-
-    @Transactional
-    @CacheEvict(value = "qr_sites", allEntries = true)
-    public TouristSiteDTO updateTouristSite(Integer id, CreateTouristSiteRequest request) {
-        validateTicketPrice(request);
-
-        TouristSite touristSite = touristSiteRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException(
-                        "Tourist site not found with id: " + id));
-        Category category = categoryRepository.findById(request.categoryId())
-                .orElseThrow(() -> new EntityNotFoundException(
-                        "Category not found with id: " + request.categoryId()));
-
-        touristSite.setName(request.name());
-        touristSite.setCategory(category);
-        touristSite.setDescription(request.description());
-        touristSite.setAddress(request.address());
-        touristSite.setCity(request.city());
-        touristSite.setImageUrl(request.imageUrl());
-        touristSite.setReferenceTicketPrice(request.referenceTicketPrice());
-        touristSite.setStatus(request.isActive());
-
-        return touristSiteMapper.toDto(touristSiteRepository.save(touristSite));
-    }
-
-    @Transactional
-    @CacheEvict(value = "qr_sites", allEntries = true)
-    public void deleteTouristSite(Integer id) {
-        TouristSite touristSite = touristSiteRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException(
-                        "Tourist site not found with id: " + id));
-        boolean hasQrCodes = qrCodeRepository.existsByTouristSite_SiteId(id);
-        boolean hasNarrations = narrationRepository.existsByTouristSite_SiteId(id);
-
-        if (hasQrCodes || !hasNarrations) {
-            throw new IllegalStateException("Cannot delete site with active dependencies");
+                return touristSiteMapper.toDetailResponse(touristSite);
         }
 
-        touristSiteRepository.delete(touristSite);
-    }
+        @Transactional
+        @CacheEvict(value = "qr_sites", allEntries = true)
+        public TouristSiteDTO createTouristSite(CreateTouristSiteRequest request) {
+                validateTicketPrice(request);
+                validateCoordinates(request);
 
-    private void validateTicketPrice(CreateTouristSiteRequest request) {
-        if (request.referenceTicketPrice() != null
-                && request.referenceTicketPrice().signum() < 0) {
-            throw new IllegalArgumentException("Reference ticket price cannot be negative");
+                Category category = categoryRepository.findById(request.categoryId())
+                                .orElseThrow(() -> new EntityNotFoundException(
+                                                "Category not found with id: " + request.categoryId()));
+                User createdBy = userRepository.findById(1)
+                                .orElseThrow(() -> new EntityNotFoundException("Default user not found"));
+
+                TouristSite touristSite = TouristSite.builder()
+                                .name(request.name())
+                                .category(category)
+                                .description(request.description())
+                                .address(request.address())
+                                .city(request.city())
+                                .imageUrl(request.imageUrl())
+                                .referenceTicketPrice(request.referenceTicketPrice())
+                                .status(request.isActive())
+                                .latitude(request.latitude())
+                                .longitude(request.longitude())
+                                .triggerRadius(request.triggerRadius() != null ? request.triggerRadius() : 20)
+                                .createdBy(createdBy)
+                                .build();
+
+                return touristSiteMapper.toDto(touristSiteRepository.save(touristSite));
         }
-    }
+
+        @Transactional
+        @CacheEvict(value = "qr_sites", allEntries = true)
+        public TouristSiteDTO updateTouristSite(Integer id, CreateTouristSiteRequest request) {
+                validateTicketPrice(request);
+                validateCoordinates(request);
+
+                TouristSite touristSite = touristSiteRepository.findById(id)
+                                .orElseThrow(() -> new EntityNotFoundException(
+                                                "Tourist site not found with id: " + id));
+                Category category = categoryRepository.findById(request.categoryId())
+                                .orElseThrow(() -> new EntityNotFoundException(
+                                                "Category not found with id: " + request.categoryId()));
+
+                touristSite.setName(request.name());
+                touristSite.setCategory(category);
+                touristSite.setDescription(request.description());
+                touristSite.setAddress(request.address());
+                touristSite.setCity(request.city());
+                touristSite.setImageUrl(request.imageUrl());
+                touristSite.setReferenceTicketPrice(request.referenceTicketPrice());
+                touristSite.setStatus(request.isActive());
+                if (request.latitude() != null) {
+                        touristSite.setLatitude(request.latitude());
+                        touristSite.setLongitude(request.longitude());
+                }
+                if (request.triggerRadius() != null) {
+                        touristSite.setTriggerRadius(request.triggerRadius());
+                }
+
+                return touristSiteMapper.toDto(touristSiteRepository.save(touristSite));
+        }
+
+        @Transactional
+        @CacheEvict(value = "qr_sites", allEntries = true)
+        public void deleteTouristSite(Integer id) {
+                TouristSite touristSite = touristSiteRepository.findById(id)
+                                .orElseThrow(() -> new EntityNotFoundException(
+                                                "Tourist site not found with id: " + id));
+                boolean hasQrCodes = qrCodeRepository.existsByTouristSite_SiteId(id);
+                boolean hasNarrations = narrationRepository.existsByTouristSite_SiteId(id);
+
+                if (hasQrCodes || hasNarrations) {
+                        throw new IllegalStateException("Cannot delete site with active dependencies");
+                }
+
+                touristSiteRepository.delete(touristSite);
+        }
+
+        private void validateTicketPrice(CreateTouristSiteRequest request) {
+                if (request.referenceTicketPrice() != null
+                                && request.referenceTicketPrice().signum() < 0) {
+                        throw new IllegalArgumentException("Reference ticket price cannot be negative");
+                }
+        }
+
+        private void validateCoordinates(CreateTouristSiteRequest request) {
+                if ((request.latitude() == null) != (request.longitude() == null)) {
+                        throw new IllegalArgumentException("Latitude and longitude must be provided together");
+                }
+        }
 }
