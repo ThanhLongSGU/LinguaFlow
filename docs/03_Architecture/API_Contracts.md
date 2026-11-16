@@ -39,6 +39,49 @@ API này trả về danh sách toàn bộ các địa điểm kèm tọa độ �
 
 Lưu ý kiến trúc: Nếu clientVersion gửi lên bằng với serverDataVersion trong DB, API chỉ trả về HTTP Status 304 (Not Modified), không cần trả body JSON để tiết kiệm băng thông
 
+## 3. Xác thực Super Admin
+
+### Đăng nhập (POST `/api/v1/auth/login`)
+
+Chỉ tài khoản Super Admin duy nhất `admin` được phép đăng nhập. Mật khẩu mặc định
+`123456` được seed và lưu dưới dạng BCrypt; sau đó có thể thay đổi bằng API đổi mật khẩu.
+
+**Request:**
+
+```json
+{
+  "username": "admin",
+  "password": "123456"
+}
+```
+
+**Response (200 OK):**
+
+```json
+{
+  "accessToken": "<JWT_TOKEN>",
+  "tokenType": "Bearer",
+  "expiresIn": 1800
+}
+```
+
+### Đổi mật khẩu (PATCH `/api/v1/auth/change-password`)
+
+Yêu cầu header `Authorization: Bearer <JWT_TOKEN>`.
+
+**Request:**
+
+```json
+{
+  "currentPassword": "123456",
+  "newPassword": "new-secure-password"
+}
+```
+
+**Response (204 No Content):** Mật khẩu mới được kiểm tra và lưu dưới dạng BCrypt.
+
+Không tồn tại endpoint đăng ký, tạo mới tài khoản hoặc khôi phục mật khẩu qua email.
+
 ## 2. Chuẩn hóa Định dạng Lỗi (Error Response - RFC 7807)
 
 Mọi lỗi trả về (400, 403, 404, 500) phải bọc trong cấu trúc chuẩn Problem Details ví dụ như sau:

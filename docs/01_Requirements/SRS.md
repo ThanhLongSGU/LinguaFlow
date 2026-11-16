@@ -9,12 +9,12 @@ Tài liệu này đặc tả các yêu cầu chức năng và phi chức năng c
 1.2. Phạm vi (Scope)
 LinguaFlow là ứng dụng Web (PWA/Web-based) hỗ trợ khách tham quan tự động nghe thuyết minh dựa trên tọa độ vị trí (GPS) và tương tác với AI. Hệ thống chia làm 2 phân hệ:
 - Phân hệ Du khách (Visitor): Đồng bộ dữ liệu offline, xem bản đồ, nghe thuyết minh tự động qua Geofencing/QR, và hỏi đáp với Trợ lý AI.
-- Phân hệ Quản trị (Admin): Thống kê hiệu suất, quản lý điểm đến (POI) và cấu hình tri thức cho hệ thống AI.
+- Phân hệ Quản trị (Super Admin duy nhất): Thống kê hiệu suất, quản lý điểm đến (POI) và cấu hình tri thức cho hệ thống AI.
 
 2. MÔ TẢ TỔNG QUAN (OVERALL DESCRIPTION)
 2.1. Phân loại người dùng (User Classes)
 - Khách tham quan (Visitor): Sử dụng trình duyệt di động, cấp quyền định vị GPS, có nhu cầu tra cứu bản đồ và nghe thuyết minh tự động.
-- Quản trị viên (Admin): Người có quyền cấu hình hệ thống, quản lý dữ liệu POI, duyệt bản dịch và nạp dữ liệu cho AI.
+- Super Admin duy nhất: Tài khoản quản trị duy nhất `admin`, có quyền cấu hình hệ thống, quản lý dữ liệu POI, duyệt bản dịch và nạp dữ liệu cho AI.
 - Hệ thống AI (System Actor): Các background worker xử lý dịch thuật, sinh file Audio (TTS) và động cơ RAG trả lời Chatbot.
 
 2.2. Ràng buộc thiết kế (Constraints)
@@ -32,7 +32,7 @@ Nhóm 3.1: Phân hệ Du khách (Visitor)
 - FR-VIS-05 [UC5]: Trợ lý Chat AI cho phép khách đặt câu hỏi chuyên sâu. Hệ thống tự động đính kèm ngữ cảnh (Vị trí, Ngôn ngữ) vào Prompt. Bắt buộc từ chối trả lời nếu vi phạm từ khóa cấm.
 
 Nhóm 3.2: Phân hệ Quản trị (Admin)
-- FR-ADM-01 [UC6]: Đăng nhập qua JWT. Phiên làm việc (Session) tự động hết hạn sau 30 phút. Khóa tài khoản 15 phút nếu nhập sai quá 5 lần.
+- FR-ADM-01 [UC6]: Hệ thống đóng, chỉ tồn tại duy nhất 01 tài khoản `admin` với vai trò `ROLE_SUPER_ADMIN`. Tài khoản được tự động seed khi chạy lần đầu với mật khẩu mặc định `123456` đã mã hóa BCrypt; hỗ trợ đổi mật khẩu qua JWT. Khóa cứng mọi chức năng tạo mới/đăng ký tài khoản theo BR-11. Phiên làm việc (Session) tự động hết hạn sau 30 phút. Khóa tài khoản 15 phút nếu nhập sai quá 5 lần.
 - FR-ADM-02 [UC7]: Dashboard hiển thị thống kê Real-time (số người online, phiên GPS) và dữ liệu lịch sử (biểu đồ lượt quét, lượt nghe) có khả năng lọc theo thời gian.
 - FR-ADM-03 [UC8]: Quản lý POI (CRUD). Admin nhập Tọa độ Lat/Lng, Bán kính kích hoạt, Tên, Mô tả, và Upload File. Khi lưu thành công, hệ thống tăng DataVersion để kích hoạt luồng cập nhật cho Du khách (UC1).
 - FR-ADM-04 [UC9]: Quản lý AI. Admin thiết lập System Prompt, danh sách từ khóa cấm (Banned Keywords) và nhấn nút đồng bộ dữ liệu POI vào Knowledge Base của AI.

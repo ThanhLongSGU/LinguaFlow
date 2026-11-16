@@ -54,8 +54,8 @@ public class TouristSiteService {
                 Category category = categoryRepository.findById(request.categoryId())
                                 .orElseThrow(() -> new EntityNotFoundException(
                                                 "Category not found with id: " + request.categoryId()));
-                User createdBy = userRepository.findById(1)
-                                .orElseThrow(() -> new EntityNotFoundException("Default user not found"));
+                User createdBy = userRepository.findByUsername("admin")
+                                .orElseThrow(() -> new EntityNotFoundException("Super Admin account not found"));
 
                 TouristSite touristSite = TouristSite.builder()
                                 .name(request.name())
