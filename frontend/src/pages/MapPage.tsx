@@ -1,7 +1,10 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Circle, CircleMarker, MapContainer, Popup, TileLayer, useMap } from "react-leaflet";
-import { resolveAssetUrl, syncPoiData, type PoiOfflineData } from "../services/api";
+import { getTouristSiteByQr, resolveAssetUrl, syncPoiData, type PoiOfflineData } from "../services/api";
 import { readPoiSnapshot, savePoiSnapshot } from "../services/poiOfflineStore";
+import QRScannerModal from "../components/QRScannerModal";
+import { canAutoPlay } from "../services/narrationCooldownStore";
+import { useNarrationPlayer } from "../hooks/useNarrationPlayer";
 import {
   calculateHaversineDistance,
   updateGeofenceState,
@@ -23,6 +26,7 @@ function FollowMapCenter({ center }: { center: Coordinates }) {
 }
 
 function MapPage() {
+  const player = useNarrationPlayer();
   const [poiList, setPoiList] = useState<PoiOfflineData[]>([]);
   const [dataVersion, setDataVersion] = useState(0);
   const [selectedSiteId, setSelectedSiteId] = useState<number | null>(null);
@@ -31,20 +35,62 @@ function MapPage() {
   const [geofence, setGeofence] = useState<GeofenceState>(EMPTY_GEOFENCE);
   const [loadingPois, setLoadingPois] = useState(true);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
+  const [autoPlayEnabled, setAutoPlayEnabled] = useState(false);
+  const [isQrScannerOpen, setIsQrScannerOpen] = useState(false);
+  const [playingSite, setPlayingSite] = useState<PoiOfflineData | null>(null);
   const [locationMessage, setLocationMessage] = useState<string | null>(() =>
     typeof navigator !== "undefined" && !navigator.geolocation ? "Trình duyệt không hỗ trợ định vị GPS." : null,
   );
   const geofenceRef = useRef<GeofenceState>(EMPTY_GEOFENCE);
   const poiListRef = useRef<PoiOfflineData[]>([]);
   const userLocationRef = useRef<Coordinates | null>(null);
+  const autoPlayEnabledRef = useRef(false);
+  const playerPlay = player.play;
+
+  const playSiteAudio = useCallback(
+    async (site: PoiOfflineData, forcePlay: boolean) => {
+      let preferredLanguage = "vi";
+      try {
+        preferredLanguage = window.localStorage.getItem("linguaflow-language")?.toLowerCase() || "vi";
+      } catch {
+        // Use Vietnamese when browser storage is unavailable.
+      }
+      const translation =
+        site.translations.find((item) => item.languageCode.toLowerCase() === preferredLanguage) ??
+        site.translations.find((item) => item.languageCode.toLowerCase() === "vi") ??
+        site.translations[0];
+      if (!translation?.audioUrl) {
+        setSyncMessage("Địa điểm này chưa có bản thuyết minh audio.");
+        return;
+      }
+
+      setPlayingSite(site);
+      setSelectedSiteId(site.siteId);
+      try {
+        await playerPlay(site.siteId, resolveAssetUrl(translation.audioUrl), forcePlay);
+      } catch {
+        // The player exposes the actionable browser error in its control panel.
+      }
+    },
+    [playerPlay],
+  );
 
   function applyGeofenceUpdate(position: Coordinates, sites: PoiOfflineData[]) {
+    const previousState = geofenceRef.current;
     const nextState = updateGeofenceState(position, sites, geofenceRef.current);
     geofenceRef.current = nextState;
     setGeofence(nextState);
 
     if (nextState.activeSiteId !== null) {
       setSelectedSiteId(nextState.activeSiteId);
+      if (
+        autoPlayEnabledRef.current &&
+        nextState.activeSiteId !== previousState.activeSiteId &&
+        canAutoPlay(nextState.activeSiteId)
+      ) {
+        const activeSite = sites.find((site) => site.siteId === nextState.activeSiteId);
+        if (activeSite) void playSiteAudio(activeSite, false);
+      }
     }
   }
 
@@ -137,6 +183,60 @@ function MapPage() {
   }, []);
 
   const selectedPoi = poiList.find((poi) => poi.siteId === selectedSiteId) ?? null;
+  const displayedGuide = playingSite ?? selectedPoi;
+  const handleQrCode = useCallback(
+    async (qrCodeValue: string) => {
+      try {
+        const detail = await getTouristSiteByQr(qrCodeValue);
+        const cachedPoi = poiListRef.current.find((poi) => poi.siteId === detail.siteId);
+        const site: PoiOfflineData = cachedPoi
+          ? {
+              ...cachedPoi,
+              name: detail.name,
+              description: detail.description,
+              address: detail.address,
+              imageUrl: detail.imageUrl,
+              translations: detail.availableTranslations.map((translation) => ({
+                languageCode: translation.languageCode,
+                audioUrl: translation.audioUrl,
+              })),
+            }
+          : {
+              siteId: detail.siteId,
+              name: detail.name,
+              address: detail.address,
+              description: detail.description,
+              latitude: 0,
+              longitude: 0,
+              triggerRadius: 0,
+              imageUrl: detail.imageUrl,
+              translations: detail.availableTranslations.map((translation) => ({
+                languageCode: translation.languageCode,
+                audioUrl: translation.audioUrl,
+              })),
+            };
+        await playSiteAudio(site, true);
+      } catch {
+        const offlineSiteId = Number(qrCodeValue);
+        const offlineSite = Number.isInteger(offlineSiteId)
+          ? poiListRef.current.find((poi) => poi.siteId === offlineSiteId)
+          : undefined;
+        if (offlineSite) {
+          await playSiteAudio(offlineSite, true);
+        } else {
+          setSyncMessage("Không thể đọc địa điểm từ mã QR khi đang offline.");
+        }
+      }
+    },
+    [playSiteAudio],
+  );
+  const handleQrDetected = useCallback(
+    (value: string) => {
+      setIsQrScannerOpen(false);
+      void handleQrCode(value);
+    },
+    [handleQrCode],
+  );
   const mapCenter = (mapFocus === "user" ? userLocation : selectedPoi) ?? userLocation ?? DEFAULT_CENTER;
   const sortedPois = useMemo(
     () =>
@@ -168,6 +268,18 @@ function MapPage() {
             onClick={() => setMapFocus((current) => (current === "user" ? "site" : "user"))}
           >
             {mapFocus === "user" ? "Về điểm đến" : "Vị trí của tôi"}
+          </button>
+          <button
+            className={`auto-play-button${autoPlayEnabled ? " is-enabled" : ""}`}
+            type="button"
+            aria-pressed={autoPlayEnabled}
+            onClick={() => {
+              const nextEnabled = !autoPlayEnabledRef.current;
+              autoPlayEnabledRef.current = nextEnabled;
+              setAutoPlayEnabled(nextEnabled);
+            }}
+          >
+            {autoPlayEnabled ? "Tắt thuyết minh tự động" : "Bật thuyết minh tự động"}
           </button>
         </div>
       </header>
@@ -238,6 +350,13 @@ function MapPage() {
                       >
                         Chọn điểm này
                       </button>
+                      <button
+                        className="popup-listen-button"
+                        type="button"
+                        onClick={() => void playSiteAudio(poi, true)}
+                      >
+                        Nghe thuyết minh
+                      </button>
                     </Popup>
                   </CircleMarker>
                 </Fragment>
@@ -266,6 +385,9 @@ function MapPage() {
               Sai số GPS khoảng {Math.round(userLocation.accuracy ?? 0)} m
             </div>
           )}
+          <button className="qr-floating-button" type="button" onClick={() => setIsQrScannerOpen(true)}>
+            <span aria-hidden="true">⌁</span> Quét mã QR
+          </button>
         </section>
 
         <aside className="poi-panel" aria-label="Danh sách điểm đến">
@@ -319,28 +441,43 @@ function MapPage() {
         </aside>
       </div>
 
-      {geofence.activeSiteId !== null && selectedPoi && (
+      {displayedGuide && (
         <section className="active-guide" aria-live="polite">
           <div>
-            <span className="map-kicker">ĐÃ VÀO VÙNG THUYẾT MINH</span>
-            <h2>{selectedPoi.name}</h2>
+            <span className="map-kicker">
+              {geofence.activeSiteId === displayedGuide.siteId ? "ĐÃ VÀO VÙNG THUYẾT MINH" : "THUYẾT MINH ĐANG CHỌN"}
+            </span>
+            <h2>{displayedGuide.name}</h2>
           </div>
-          {selectedPoi.translations.length > 0 ? (
-            <audio
-              controls
-              preload="none"
-              src={resolveAssetUrl(
-                selectedPoi.translations.find((translation) => translation.languageCode === "vi")?.audioUrl ??
-                  selectedPoi.translations[0].audioUrl,
-              )}
-            >
-              Trình duyệt không hỗ trợ phát audio.
-            </audio>
+          {player.currentSiteId === displayedGuide.siteId && player.currentUrl ? (
+            <div className="narration-controls">
+              <button type="button" onClick={player.isPlaying ? player.pause : () => void player.play(
+                displayedGuide.siteId,
+                player.currentUrl ?? "",
+                true,
+              )}>
+                {player.isPlaying ? "Tạm dừng" : "Phát"}
+              </button>
+              <button type="button" onClick={player.replay}>Phát lại</button>
+              <span className="narration-time">
+                {Math.floor(player.currentTime)}s / {Math.floor(player.duration)}s
+              </span>
+              {player.error && <span className="narration-error">{player.error}</span>}
+            </div>
+          ) : displayedGuide.translations.length > 0 ? (
+            <button type="button" className="listen-button" onClick={() => void playSiteAudio(displayedGuide, true)}>
+              Phát thuyết minh
+            </button>
           ) : (
             <span className="poi-empty">Chưa có audio cho địa điểm này.</span>
           )}
         </section>
       )}
+      <QRScannerModal
+        isOpen={isQrScannerOpen}
+        onClose={() => setIsQrScannerOpen(false)}
+        onDetected={handleQrDetected}
+      />
     </main>
   );
 }
