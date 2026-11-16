@@ -6,6 +6,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.security.core.AuthenticationException;
 
 import java.time.Instant;
 
@@ -24,6 +25,13 @@ public class GlobalExceptionHandler {
             IllegalArgumentException exception,
             HttpServletRequest request) {
         return buildResponse(HttpStatus.BAD_REQUEST, exception.getMessage(), request);
+    }
+
+    @ExceptionHandler(AuthenticationException.class)
+    public ResponseEntity<ErrorResponse> handleAuthentication(
+            AuthenticationException exception,
+            HttpServletRequest request) {
+        return buildResponse(HttpStatus.UNAUTHORIZED, exception.getMessage(), request);
     }
 
     @ExceptionHandler(Exception.class)
