@@ -2,7 +2,7 @@ TỪ ĐIỂN DỮ LIỆU (DATA DICTIONARY) - LINGUAFLOW
 Quy ước: PK (Khóa chính), FK (Khóa ngoại), UK (Khóa duy nhất).
 
 1. Nhóm Quản trị & Danh mục
-- Users: Lưu thông tin tài khoản (UserId PK, Username UK, PasswordHash, FullName, Role, IsActive).
+- Users: Lưu duy nhất 01 bản ghi tài khoản `admin` được seed tự động khi khởi chạy lần đầu (UserId PK, Username UK, PasswordHash BCrypt, FullName, Role = `ROLE_SUPER_ADMIN`, IsActive). Hệ thống không cung cấp chức năng đăng ký hoặc tạo tài khoản mới.
 - Categories: Phân loại địa điểm (CategoryId PK, Name, Description).
 - Languages: Quản lý ngôn ngữ (LanguageId PK, Code UK, Name, IsActive).
 
@@ -12,8 +12,11 @@ Quy ước: PK (Khóa chính), FK (Khóa ngoại), UK (Khóa duy nhất).
   + CategoryId (INT, FK), CreatedBy (INT, FK).
   + Latitude, Longitude (DECIMAL(10,7)): Tọa độ không gian WGS84, độ chính xác đến centimet để phục vụ Geofencing.
   + TriggerRadius (INT): Bán kính kích hoạt GPS tự động phát Audio (đơn vị: mét).
-  + DataVersion (INT): Cờ phiên bản để thiết bị khách kiểm tra và tải gói dữ liệu offline.
   + Status (BIT): Trạng thái hoạt động.
+
+- PoiSyncMetadata: Lưu phiên bản đồng bộ POI toàn cục, dùng chung cho mọi thiết bị khách.
+  + MetadataId (INT, PK): Khóa singleton, luôn có giá trị 1.
+  + DataVersion (BIGINT): Phiên bản tăng khi dữ liệu POI, bản dịch hoặc ngôn ngữ thay đổi.
 
 - QRCodes: Lưu mã QR dùng làm phương thức dự phòng khi thiết bị mất tín hiệu GPS.
   + QrId (INT, PK), SiteId (INT, FK).

@@ -5,7 +5,7 @@ erDiagram
         NVARCHAR(50) Username UK
         NVARCHAR(255) PasswordHash
         NVARCHAR(100) FullName
-        NVARCHAR(20) Role "ROLE_ADMIN, ROLE_CONTENT"
+        NVARCHAR(20) Role "ROLE_SUPER_ADMIN (Duy nhất 1 tài khoản admin)"
         BIT IsActive
     }
     Categories {
@@ -34,8 +34,12 @@ erDiagram
         NVARCHAR(500) ImageUrl
         DECIMAL(12_2) ReferenceTicketPrice
         BIT Status
-        INT DataVersion "Phiên bản dữ liệu đồng bộ Client"
         DATETIME2 UpdatedAt
+    }
+
+    PoiSyncMetadata {
+        INT MetadataId PK "Singleton = 1"
+        BIGINT DataVersion "Phiên bản đồng bộ toàn cục"
     }
 
     QRCodes {
