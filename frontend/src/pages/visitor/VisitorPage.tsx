@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { getTouristSiteByQr, resolveAssetUrl, type TouristSiteDetail, type TranslationItem } from "../../services/api";
 import { useLanguage } from "../../contexts/LanguageContext";
 import LanguageSelector from "../../components/LanguageSelector";
+import { languageMatches } from "../../i18n/translations";
 
 function VisitorPage() {
   const { narrationLanguage, t } = useLanguage();
@@ -24,8 +25,8 @@ function VisitorPage() {
       .then((result) => {
         setSite(result);
         setSelectedTranslation(
-          result.translations.find((item) => item.languageCode.toLowerCase() === narrationLanguage) ??
-            result.translations.find((item) => item.languageCode.toLowerCase() === "vi") ??
+          result.translations.find((item) => languageMatches(item.languageCode, narrationLanguage)) ??
+            result.translations.find((item) => languageMatches(item.languageCode, "vi-VN")) ??
             result.translations[0] ??
             null,
         );
@@ -46,8 +47,8 @@ function VisitorPage() {
   useEffect(() => {
     if (!site) return;
     setSelectedTranslation(
-      site.translations.find((item) => item.languageCode.toLowerCase() === narrationLanguage) ??
-        site.translations.find((item) => item.languageCode.toLowerCase() === "vi") ??
+        site.translations.find((item) => languageMatches(item.languageCode, narrationLanguage)) ??
+        site.translations.find((item) => languageMatches(item.languageCode, "vi-VN")) ??
         site.translations[0] ??
         null,
     );

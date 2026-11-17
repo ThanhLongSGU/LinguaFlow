@@ -11,6 +11,7 @@ import { readPoiSnapshot, savePoiSnapshot } from "../services/poiOfflineStore";
 import QRScannerModal from "../components/QRScannerModal";
 import LanguageSelector from "../components/LanguageSelector";
 import { useLanguage } from "../contexts/LanguageContext";
+import { languageMatches } from "../i18n/translations";
 import { canAutoPlay } from "../services/narrationCooldownStore";
 import { useNarrationPlayer } from "../hooks/useNarrationPlayer";
 import {
@@ -58,8 +59,8 @@ function MapPage() {
   const playerPlay = player.play;
   const getPreferredTranslation = useCallback(
     (site: PoiOfflineData) =>
-      site.translations.find((item) => item.languageCode.toLowerCase() === narrationLanguage) ??
-      site.translations.find((item) => item.languageCode.toLowerCase() === "vi") ??
+      site.translations.find((item) => languageMatches(item.languageCode, narrationLanguage)) ??
+      site.translations.find((item) => languageMatches(item.languageCode, "vi-VN")) ??
       site.translations[0],
     [narrationLanguage],
   );

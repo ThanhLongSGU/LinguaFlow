@@ -1,6 +1,12 @@
-export const supportedLanguages = ["vi", "en", "ja", "ko"] as const;
+export const supportedLanguages = ["vi-VN", "en-US", "zh-CN", "ja-JP", "hi-IN", "fr-FR", "ar"] as const;
 
 export type Language = (typeof supportedLanguages)[number];
+
+export function languageMatches(availableLanguage: string, selectedLanguage: Language): boolean {
+  const available = availableLanguage.toLowerCase();
+  const selected = selectedLanguage.toLowerCase();
+  return available === selected || available.split("-")[0] === selected.split("-")[0];
+}
 
 export interface TranslationDictionary {
   app: {
@@ -59,8 +65,11 @@ export interface TranslationDictionary {
     selectorLabel: string;
     vietnamese: string;
     english: string;
+    chinese: string;
     japanese: string;
-    korean: string;
+    hindi: string;
+    french: string;
+    arabic: string;
   };
   visitor: {
     mapLink: string;
@@ -134,8 +143,11 @@ const vi: TranslationDictionary = {
     selectorLabel: "Chọn ngôn ngữ",
     vietnamese: "Tiếng Việt",
     english: "English",
+    chinese: "中文",
     japanese: "日本語",
-    korean: "한국어",
+    hindi: "हिन्दी",
+    french: "Français",
+    arabic: "العربية",
   },
   visitor: {
     mapLink: "Bản đồ GPS",
@@ -209,8 +221,11 @@ const en: TranslationDictionary = {
     selectorLabel: "Choose language",
     vietnamese: "Tiếng Việt",
     english: "English",
+    chinese: "中文",
     japanese: "日本語",
-    korean: "한국어",
+    hindi: "हिन्दी",
+    french: "Français",
+    arabic: "العربية",
   },
   visitor: {
     mapLink: "GPS map",
@@ -231,15 +246,21 @@ const en: TranslationDictionary = {
 };
 
 export const translations: Record<Language, TranslationDictionary> = {
-  vi,
-  en,
-  ja: vi,
-  ko: vi,
+  "vi-VN": vi,
+  "en-US": en,
+  "zh-CN": en,
+  "ja-JP": en,
+  "hi-IN": en,
+  "fr-FR": en,
+  ar: en,
 };
 
 export const languageLabels: Record<Language, string> = {
-  vi: vi.language.vietnamese,
-  en: en.language.english,
-  ja: vi.language.japanese,
-  ko: vi.language.korean,
+  "vi-VN": vi.language.vietnamese,
+  "en-US": en.language.english,
+  "zh-CN": vi.language.chinese,
+  "ja-JP": vi.language.japanese,
+  "hi-IN": vi.language.hindi,
+  "fr-FR": vi.language.french,
+  ar: vi.language.arabic,
 };

@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 import {
+  languageMatches,
   supportedLanguages,
   translations,
   type Language,
@@ -11,14 +12,20 @@ const NARRATION_STORAGE_KEY = "linguaflow_narration_lang";
 const LEGACY_STORAGE_KEY = "linguaflow_lang";
 
 function readLanguage(key: string): Language {
-  if (typeof window === "undefined") return "vi";
+  if (typeof window === "undefined") return "vi-VN";
   try {
     const stored =
       window.localStorage.getItem(key) ??
       (key === UI_STORAGE_KEY ? window.localStorage.getItem(LEGACY_STORAGE_KEY) : null);
-    return stored && supportedLanguages.includes(stored as Language) ? (stored as Language) : "vi";
+    if (stored) {
+      const selected = supportedLanguages.find((language) => languageMatches(stored, language));
+      if (selected) return selected;
+    }
+
+    const deviceLanguage = window.navigator.language;
+    return supportedLanguages.find((language) => languageMatches(deviceLanguage, language)) ?? "vi-VN";
   } catch {
-    return "vi";
+    return "vi-VN";
   }
 }
 
