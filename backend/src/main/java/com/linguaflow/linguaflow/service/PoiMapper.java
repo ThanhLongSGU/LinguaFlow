@@ -12,6 +12,7 @@ import java.util.List;
 public interface PoiMapper {
 
         @Mapping(source = "category.categoryId", target = "categoryId")
+        @Mapping(source = "region.regionId", target = "regionId")
         @Mapping(target = "translations", ignore = true)
         PoiSyncResponse.PoiItem toPoiItemBase(TouristSite site);
 
@@ -25,12 +26,14 @@ public interface PoiMapper {
                                                 translation.getLanguage().getCode(),
                                                 new PoiSyncResponse.PoiTranslation(
                                                                 translation.getLanguage().getCode(),
+                                                                translation.getContent(),
                                                                 translation.getAudioUrl())));
 
                 return new PoiSyncResponse.PoiItem(
                                 base.siteId(),
                                 base.name(),
                                 base.categoryId(),
+                                base.regionId(),
                                 base.description(),
                                 base.latitude(),
                                 base.longitude(),

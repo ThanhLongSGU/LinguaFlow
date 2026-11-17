@@ -4,26 +4,28 @@ export interface TranslationItem {
   languageCode: string;
   languageName: string;
   content: string;
-  audioUrl: string;
-  isDefault: boolean;
+  audioUrl: string | null;
 }
 
 export interface TouristSiteDetail {
   siteId: number;
+  regionId: number;
   name: string;
   description: string;
   imageUrl: string;
   address: string;
-  availableTranslations: TranslationItem[];
+  translations: TranslationItem[];
 }
 
 export interface PoiTranslation {
   languageCode: string;
-  audioUrl: string;
+  audioUrl: string | null;
+  content?: string;
 }
 
 export interface PoiOfflineData {
   siteId: number;
+  regionId: number;
   name: string;
   address: string;
   description: string;
@@ -38,6 +40,23 @@ export interface PoiSyncResponse {
   serverDataVersion: number;
   isUpdated: boolean;
   poiList: PoiOfflineData[];
+}
+
+export interface RegionAudioItem {
+  audioId: number;
+  siteId: number;
+  translationId: number;
+  languageCode: string;
+  audioVersion: number;
+  contentHash: string;
+  audioUrl: string;
+}
+
+export interface RegionAudioManifest {
+  regionId: number;
+  languageCode: string;
+  generatedAt: string;
+  items: RegionAudioItem[];
 }
 
 export async function getTouristSiteByQr(qrCodeValue: string, signal?: AbortSignal): Promise<TouristSiteDetail> {
@@ -65,6 +84,23 @@ export async function syncPoiData(clientVersion: number = 0, signal?: AbortSigna
   }
 
   return (await response.json()) as PoiSyncResponse;
+}
+
+export async function getRegionAudioManifest(
+  regionId: number,
+  languageCode: string,
+  signal?: AbortSignal,
+): Promise<RegionAudioManifest> {
+  const response = await fetch(
+    `${apiBaseURL}/regions/${encodeURIComponent(regionId)}/audio?languageCode=${encodeURIComponent(languageCode)}`,
+    { signal },
+  );
+
+  if (!response.ok) {
+    throw new Error(`Không thể tải Audio của phân khu (HTTP ${response.status}).`);
+  }
+
+  return (await response.json()) as RegionAudioManifest;
 }
 
 export function resolveAssetUrl(path: string): string {

@@ -1,8 +1,16 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Circle, CircleMarker, MapContainer, Popup, TileLayer, useMap } from "react-leaflet";
-import { getTouristSiteByQr, resolveAssetUrl, syncPoiData, type PoiOfflineData } from "../services/api";
+import {
+  getRegionAudioManifest,
+  getTouristSiteByQr,
+  resolveAssetUrl,
+  syncPoiData,
+  type PoiOfflineData,
+} from "../services/api";
 import { readPoiSnapshot, savePoiSnapshot } from "../services/poiOfflineStore";
 import QRScannerModal from "../components/QRScannerModal";
+import LanguageSelector from "../components/LanguageSelector";
+import { useLanguage } from "../contexts/LanguageContext";
 import { canAutoPlay } from "../services/narrationCooldownStore";
 import { useNarrationPlayer } from "../hooks/useNarrationPlayer";
 import {
@@ -26,6 +34,7 @@ function FollowMapCenter({ center }: { center: Coordinates }) {
 }
 
 function MapPage() {
+  const { language, narrationLanguage, t } = useLanguage();
   const player = useNarrationPlayer();
   const [poiList, setPoiList] = useState<PoiOfflineData[]>([]);
   const [dataVersion, setDataVersion] = useState(0);
@@ -39,28 +48,27 @@ function MapPage() {
   const [isQrScannerOpen, setIsQrScannerOpen] = useState(false);
   const [playingSite, setPlayingSite] = useState<PoiOfflineData | null>(null);
   const [locationMessage, setLocationMessage] = useState<string | null>(() =>
-    typeof navigator !== "undefined" && !navigator.geolocation ? "Trình duyệt không hỗ trợ định vị GPS." : null,
+    typeof navigator !== "undefined" && !navigator.geolocation ? t("map", "gpsUnsupported") : null,
   );
   const geofenceRef = useRef<GeofenceState>(EMPTY_GEOFENCE);
   const poiListRef = useRef<PoiOfflineData[]>([]);
   const userLocationRef = useRef<Coordinates | null>(null);
   const autoPlayEnabledRef = useRef(false);
+  const previousLanguageRef = useRef(language);
   const playerPlay = player.play;
+  const getPreferredTranslation = useCallback(
+    (site: PoiOfflineData) =>
+      site.translations.find((item) => item.languageCode.toLowerCase() === narrationLanguage) ??
+      site.translations.find((item) => item.languageCode.toLowerCase() === "vi") ??
+      site.translations[0],
+    [narrationLanguage],
+  );
 
   const playSiteAudio = useCallback(
     async (site: PoiOfflineData, forcePlay: boolean) => {
-      let preferredLanguage = "vi";
-      try {
-        preferredLanguage = window.localStorage.getItem("linguaflow-language")?.toLowerCase() || "vi";
-      } catch {
-        // Use Vietnamese when browser storage is unavailable.
-      }
-      const translation =
-        site.translations.find((item) => item.languageCode.toLowerCase() === preferredLanguage) ??
-        site.translations.find((item) => item.languageCode.toLowerCase() === "vi") ??
-        site.translations[0];
+      const translation = getPreferredTranslation(site);
       if (!translation?.audioUrl) {
-        setSyncMessage("Địa điểm này chưa có bản thuyết minh audio.");
+        setSyncMessage(t("map", "noAudio"));
         return;
       }
 
@@ -72,8 +80,16 @@ function MapPage() {
         // The player exposes the actionable browser error in its control panel.
       }
     },
-    [playerPlay],
+    [getPreferredTranslation, playerPlay, t],
   );
+
+  useEffect(() => {
+    if (previousLanguageRef.current === narrationLanguage) return;
+    previousLanguageRef.current = narrationLanguage;
+    if (playingSite && player.currentSiteId === playingSite.siteId) {
+      void playSiteAudio(playingSite, true);
+    }
+  }, [narrationLanguage, playingSite, player.currentSiteId, playSiteAudio]);
 
   function applyGeofenceUpdate(position: Coordinates, sites: PoiOfflineData[]) {
     const previousState = geofenceRef.current;
@@ -115,7 +131,7 @@ function MapPage() {
           }
         }
       } catch {
-        if (!disposed) setSyncMessage("Không đọc được gói POI đã lưu trên thiết bị.");
+        if (!disposed) setSyncMessage(t("map", "syncReadError"));
       }
 
       try {
@@ -139,8 +155,8 @@ function MapPage() {
         if (controller.signal.aborted || disposed) return;
         setSyncMessage(
           error instanceof Error
-            ? `${error.message} ${cachedVersion > 0 ? "Đang dùng dữ liệu offline." : ""}`
-            : "Không thể đồng bộ POI.",
+            ? `${error.message} ${cachedVersion > 0 ? t("map", "syncOffline") : ""}`
+            : t("map", "syncUnavailable"),
         );
       } finally {
         if (!disposed) setLoadingPois(false);
@@ -172,8 +188,8 @@ function MapPage() {
       (error) => {
         const message =
           error.code === error.PERMISSION_DENIED
-            ? "Hãy cho phép truy cập vị trí để bật thuyết minh theo GPS."
-            : "Chưa lấy được vị trí GPS. Bạn vẫn có thể xem bản đồ và các điểm đến.";
+            ? t("map", "gpsPermission")
+            : t("map", "gpsUnavailable");
         setLocationMessage(message);
       },
       { enableHighAccuracy: true, maximumAge: 10_000, timeout: 15_000 },
@@ -182,8 +198,24 @@ function MapPage() {
     return () => navigator.geolocation.clearWatch(watchId);
   }, []);
 
+  useEffect(() => {
+    const activeSiteId = geofence.activeSiteId;
+    if (activeSiteId === null) return;
+
+    const activeSite = poiListRef.current.find((site) => site.siteId === activeSiteId);
+    if (!activeSite) return;
+
+    const controller = new AbortController();
+    void getRegionAudioManifest(activeSite.regionId, narrationLanguage, controller.signal).catch(() => {
+      // Playback continues from the local POI snapshot when the manifest is unavailable.
+    });
+
+    return () => controller.abort();
+  }, [geofence.activeSiteId, narrationLanguage]);
+
   const selectedPoi = poiList.find((poi) => poi.siteId === selectedSiteId) ?? null;
   const displayedGuide = playingSite ?? selectedPoi;
+  const selectedTranslation = displayedGuide ? getPreferredTranslation(displayedGuide) : null;
   const handleQrCode = useCallback(
     async (qrCodeValue: string) => {
       try {
@@ -192,17 +224,20 @@ function MapPage() {
         const site: PoiOfflineData = cachedPoi
           ? {
               ...cachedPoi,
+              regionId: detail.regionId,
               name: detail.name,
               description: detail.description,
               address: detail.address,
               imageUrl: detail.imageUrl,
-              translations: detail.availableTranslations.map((translation) => ({
+              translations: detail.translations.map((translation) => ({
                 languageCode: translation.languageCode,
                 audioUrl: translation.audioUrl,
+                content: translation.content,
               })),
             }
           : {
               siteId: detail.siteId,
+              regionId: detail.regionId,
               name: detail.name,
               address: detail.address,
               description: detail.description,
@@ -210,9 +245,10 @@ function MapPage() {
               longitude: 0,
               triggerRadius: 0,
               imageUrl: detail.imageUrl,
-              translations: detail.availableTranslations.map((translation) => ({
+              translations: detail.translations.map((translation) => ({
                 languageCode: translation.languageCode,
                 audioUrl: translation.audioUrl,
+                content: translation.content,
               })),
             };
         await playSiteAudio(site, true);
@@ -224,7 +260,7 @@ function MapPage() {
         if (offlineSite) {
           await playSiteAudio(offlineSite, true);
         } else {
-          setSyncMessage("Không thể đọc địa điểm từ mã QR khi đang offline.");
+          setSyncMessage(t("qr", "offlineError"));
         }
       }
     },
@@ -253,13 +289,13 @@ function MapPage() {
     <main className="map-page">
       <header className="map-header">
         <div>
-          <span className="map-kicker">LINGUAFLOW · OFFLINE GUIDE</span>
-          <h1>Khám phá quanh bạn</h1>
+          <span className="map-kicker">{t("app", "brand")} · {t("app", "offlineGuide")}</span>
+          <h1>{t("map", "title")}</h1>
         </div>
         <div className="map-status">
           <span className={`gps-indicator${userLocation ? " is-live" : ""}`} />
-          <span>{userLocation ? "Đang nhận GPS" : "Đang chờ GPS"}</span>
-          <span className="version-label">POI v{dataVersion}</span>
+          <span>{userLocation ? t("map", "gpsReceiving") : t("map", "gpsWaiting")}</span>
+          <span className="version-label">{t("map", "dataVersion", { version: dataVersion })}</span>
           <button
             className="locate-button"
             type="button"
@@ -267,7 +303,7 @@ function MapPage() {
             aria-pressed={mapFocus === "user"}
             onClick={() => setMapFocus((current) => (current === "user" ? "site" : "user"))}
           >
-            {mapFocus === "user" ? "Về điểm đến" : "Vị trí của tôi"}
+            {mapFocus === "user" ? t("map", "backToDestination") : t("map", "myLocation")}
           </button>
           <button
             className={`auto-play-button${autoPlayEnabled ? " is-enabled" : ""}`}
@@ -279,8 +315,10 @@ function MapPage() {
               setAutoPlayEnabled(nextEnabled);
             }}
           >
-            {autoPlayEnabled ? "Tắt thuyết minh tự động" : "Bật thuyết minh tự động"}
+            {autoPlayEnabled ? t("map", "autoPlayOn") : t("map", "autoPlayOff")}
           </button>
+          <LanguageSelector />
+          <LanguageSelector mode="narration" />
         </div>
       </header>
 
@@ -292,7 +330,7 @@ function MapPage() {
       )}
 
       <div className="map-layout">
-        <section className="map-frame" aria-label="Bản đồ điểm đến">
+        <section className="map-frame" aria-label={t("map", "destinations")}>
           <MapContainer
             center={[mapCenter.latitude, mapCenter.longitude]}
             zoom={14}
@@ -348,14 +386,14 @@ function MapPage() {
                           setMapFocus("site");
                         }}
                       >
-                        Chọn điểm này
+                        {t("map", "selectDestination")}
                       </button>
                       <button
                         className="popup-listen-button"
                         type="button"
                         onClick={() => void playSiteAudio(poi, true)}
                       >
-                        Nghe thuyết minh
+                        {t("map", "listen")}
                       </button>
                     </Popup>
                   </CircleMarker>
@@ -374,7 +412,9 @@ function MapPage() {
                   radius={8}
                   pathOptions={{ color: "#fff", weight: 3, fillColor: "#2875c7", fillOpacity: 1 }}
                 >
-                  <Popup>Bạn đang ở đây (sai số ±{Math.round(userLocation.accuracy ?? 0)} m)</Popup>
+                  <Popup>
+                    {t("map", "userHere", { meters: Math.round(userLocation.accuracy ?? 0) })}
+                  </Popup>
                 </CircleMarker>
               </>
             )}
@@ -382,27 +422,27 @@ function MapPage() {
           {userLocation && (
             <div className="position-readout">
               <span className="position-dot" />
-              Sai số GPS khoảng {Math.round(userLocation.accuracy ?? 0)} m
+              {t("map", "gpsAccuracy", { meters: Math.round(userLocation.accuracy ?? 0) })}
             </div>
           )}
           <button className="qr-floating-button" type="button" onClick={() => setIsQrScannerOpen(true)}>
-            <span aria-hidden="true">⌁</span> Quét mã QR
+            <span aria-hidden="true">⌁</span> {t("map", "qrScan")}
           </button>
         </section>
 
-        <aside className="poi-panel" aria-label="Danh sách điểm đến">
+        <aside className="poi-panel" aria-label={t("map", "destinations")}>
           <div className="poi-panel-heading">
             <div>
-              <span className="map-kicker">ĐÃ ĐỒNG BỘ</span>
-              <h2>Điểm đến</h2>
+              <span className="map-kicker">{t("map", "synced")}</span>
+              <h2>{t("map", "destinations")}</h2>
             </div>
-            <span className="poi-count">{poiList.length}</span>
+            <span className="poi-count">{poiList.length} {t("map", "destinationCount")}</span>
           </div>
 
           {loadingPois && poiList.length === 0 ? (
-            <p className="poi-empty">Đang tải gói địa điểm...</p>
+            <p className="poi-empty">{t("map", "loadingPois")}</p>
           ) : sortedPois.length === 0 ? (
-            <p className="poi-empty">Chưa có gói POI trên thiết bị. Kết nối mạng để đồng bộ.</p>
+            <p className="poi-empty">{t("map", "noPois")}</p>
           ) : (
             <div className="poi-list">
               {sortedPois.map(({ poi, distance }) => {
@@ -429,10 +469,17 @@ function MapPage() {
                     )}
                     <span className="poi-row-copy">
                       <strong>{poi.name}</strong>
-                      <span>{poi.address || poi.description || `Địa điểm ${poi.siteId}`}</span>
-                      {distance !== null && <small>{Math.round(distance)} m từ vị trí của bạn</small>}
+                      <span>
+                        {poi.address ||
+                          getPreferredTranslation(poi)?.content ||
+                          poi.description ||
+                          `${t("map", "destinations")} ${poi.siteId}`}
+                      </span>
+                      {distance !== null && (
+                        <small>{t("map", "distance", { meters: Math.round(distance) })}</small>
+                      )}
                     </span>
-                    {isActive && <span className="nearby-tag">ĐANG Ở ĐÂY</span>}
+                    {isActive && <span className="nearby-tag">{t("map", "nearby")}</span>}
                   </button>
                 );
               })}
@@ -445,9 +492,16 @@ function MapPage() {
         <section className="active-guide" aria-live="polite">
           <div>
             <span className="map-kicker">
-              {geofence.activeSiteId === displayedGuide.siteId ? "ĐÃ VÀO VÙNG THUYẾT MINH" : "THUYẾT MINH ĐANG CHỌN"}
+              {geofence.activeSiteId === displayedGuide.siteId
+                ? t("map", "activeGuide")
+                : t("map", "selectedGuide")}
             </span>
             <h2>{displayedGuide.name}</h2>
+            {selectedTranslation?.content ? (
+              <p className="active-guide-description">{selectedTranslation.content}</p>
+            ) : displayedGuide.description ? (
+              <p className="active-guide-description">{displayedGuide.description}</p>
+            ) : null}
           </div>
           {player.currentSiteId === displayedGuide.siteId && player.currentUrl ? (
             <div className="narration-controls">
@@ -456,20 +510,29 @@ function MapPage() {
                 player.currentUrl ?? "",
                 true,
               )}>
-                {player.isPlaying ? "Tạm dừng" : "Phát"}
+                {player.isPlaying ? t("audio", "pause") : t("audio", "play")}
               </button>
-              <button type="button" onClick={player.replay}>Phát lại</button>
+              <button type="button" onClick={player.replay}>{t("audio", "replay")}</button>
               <span className="narration-time">
-                {Math.floor(player.currentTime)}s / {Math.floor(player.duration)}s
+                {t("audio", "timeSeconds", {
+                  current: Math.floor(player.currentTime),
+                  duration: Math.floor(player.duration),
+                })}
               </span>
-              {player.error && <span className="narration-error">{player.error}</span>}
+              {player.error && (
+                <span className="narration-error">
+                  {player.error === "autoplayBlocked"
+                    ? t("audio", "autoplayBlocked")
+                    : t("audio", "playbackError")}
+                </span>
+              )}
             </div>
           ) : displayedGuide.translations.length > 0 ? (
             <button type="button" className="listen-button" onClick={() => void playSiteAudio(displayedGuide, true)}>
-              Phát thuyết minh
+              {t("map", "listen")}
             </button>
           ) : (
-            <span className="poi-empty">Chưa có audio cho địa điểm này.</span>
+            <span className="poi-empty">{t("map", "noAudio")}</span>
           )}
         </section>
       )}

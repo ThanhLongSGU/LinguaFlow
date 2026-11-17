@@ -18,6 +18,8 @@ import lombok.ToString;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 @Entity
 @Table(name = "Languages")
@@ -54,4 +56,11 @@ public class Language {
     @EqualsAndHashCode.Exclude
     @Builder.Default
     private List<AiTranslationTask> aiTranslationTasks = new ArrayList<>();
+
+    @OneToMany(mappedBy = "language", fetch = FetchType.LAZY)
+    @JsonIgnore
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    @Builder.Default
+    private Set<SiteLanguage> siteLanguages = new LinkedHashSet<>();
 }

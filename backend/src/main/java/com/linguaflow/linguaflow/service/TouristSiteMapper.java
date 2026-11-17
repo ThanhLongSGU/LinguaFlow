@@ -14,9 +14,11 @@ import java.util.List;
 @Mapper(componentModel = "spring")
 public interface TouristSiteMapper {
 
+    @Mapping(source = "region.regionId", target = "regionId")
     TouristSiteDTO toDto(TouristSite touristSite);
 
     @Mapping(target = "translations", ignore = true)
+    @Mapping(source = "region.regionId", target = "regionId")
     TouristSiteDetailResponse toBaseDetailResponse(TouristSite touristSite);
 
     default TouristSiteDetailResponse toDetailResponse(TouristSite touristSite) {

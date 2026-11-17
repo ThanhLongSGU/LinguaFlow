@@ -12,6 +12,7 @@ import lombok.NoArgsConstructor;
 public class TouristSiteDTO {
 
     private Integer siteId;
+    private Integer regionId;
     private String name;
     private String description;
     private String imageUrl;

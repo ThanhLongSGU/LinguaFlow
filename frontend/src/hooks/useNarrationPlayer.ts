@@ -7,7 +7,7 @@ export interface NarrationPlayerState {
   isPlaying: boolean;
   currentTime: number;
   duration: number;
-  error: string | null;
+  error: "autoplayBlocked" | "playbackError" | null;
 }
 
 const EMPTY_STATE: NarrationPlayerState = {
@@ -35,7 +35,7 @@ class NarrationPlayer {
       this.update({ isPlaying: false, currentTime: this.audio.duration || 0 });
     });
     this.audio.addEventListener("error", () => {
-      this.update({ isPlaying: false, error: "Không thể phát audio cho địa điểm này." });
+      this.update({ isPlaying: false, error: "playbackError" });
     });
   }
 
@@ -64,8 +64,8 @@ class NarrationPlayer {
       this.update({
         isPlaying: false,
         error: error instanceof DOMException && error.name === "NotAllowedError"
-          ? "Trình duyệt chặn phát tự động. Hãy bấm Play để nghe thuyết minh."
-          : "Không thể phát audio cho địa điểm này.",
+          ? "autoplayBlocked"
+          : "playbackError",
       });
       throw error;
     }

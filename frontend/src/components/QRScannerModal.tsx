@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Html5Qrcode } from "html5-qrcode";
+import { useLanguage } from "../contexts/LanguageContext";
 
 interface QRScannerModalProps {
   isOpen: boolean;
@@ -10,6 +11,7 @@ interface QRScannerModalProps {
 const SCANNER_ID = "linguaflow-qr-reader";
 
 function QRScannerModal({ isOpen, onClose, onDetected }: QRScannerModalProps) {
+  const { t } = useLanguage();
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -45,14 +47,14 @@ function QRScannerModal({ isOpen, onClose, onDetected }: QRScannerModalProps) {
         () => undefined,
       )
       .catch(() => {
-        if (!disposed) setError("Không thể truy cập camera. Hãy cấp quyền camera hoặc dùng thiết bị có camera.");
+        if (!disposed) setError(t("qr", "cameraError"));
       });
 
     return () => {
       disposed = true;
       void stopScanner();
     };
-  }, [isOpen, onDetected]);
+  }, [isOpen, onDetected, t]);
 
   if (!isOpen) return null;
 
@@ -61,18 +63,18 @@ function QRScannerModal({ isOpen, onClose, onDetected }: QRScannerModalProps) {
       <section className="qr-modal" role="dialog" aria-modal="true" aria-labelledby="qr-modal-title">
         <div className="qr-modal-header">
           <div>
-            <span className="map-kicker">CAMERA</span>
-            <h2 id="qr-modal-title">Quét mã QR</h2>
+            <span className="map-kicker">{t("qr", "camera")}</span>
+            <h2 id="qr-modal-title">{t("qr", "title")}</h2>
           </div>
-          <button type="button" className="qr-close-button" onClick={onClose} aria-label="Đóng">
+          <button type="button" className="qr-close-button" onClick={onClose} aria-label={t("qr", "close")}>
             ×
           </button>
         </div>
         <div id={SCANNER_ID} className="qr-reader" />
         {error && <p className="qr-error" role="alert">{error}</p>}
-        <p className="qr-help">Đưa mã QR vào khung hình để mở thuyết minh.</p>
+        <p className="qr-help">{t("qr", "help")}</p>
         <button type="button" className="qr-cancel-button" onClick={onClose}>
-          Đóng camera
+          {t("qr", "closeCamera")}
         </button>
       </section>
     </div>
