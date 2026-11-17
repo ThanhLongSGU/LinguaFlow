@@ -21,6 +21,8 @@ public final class ApiDtos {
                             long activeSessions, long totalVisits) {}
     public record AdminStats(long totalStarted, long activeSessions, long totalVisits,
                              long demoActiveSessions, List<SiteStats> sites) {}
+    public record DailyVisits(String date, long visits) {}
+    public record MonthlyVisits(String month, long totalVisits, List<DailyVisits> days) {}
     public record SiteEditRequest(
             @NotBlank String name,
             @NotNull Integer categoryId,

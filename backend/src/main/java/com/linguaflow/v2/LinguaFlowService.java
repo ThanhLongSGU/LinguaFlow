@@ -1,6 +1,13 @@
 package com.linguaflow.v2;
 
 import java.time.Instant;
+import java.time.YearMonth;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeParseException;
+import java.time.format.DateTimeFormatter;
+import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -15,6 +22,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.linguaflow.v2.ApiDtos.AdminStats;
+import com.linguaflow.v2.ApiDtos.DailyVisits;
+import com.linguaflow.v2.ApiDtos.MonthlyVisits;
 import com.linguaflow.v2.ApiDtos.HeartbeatRequest;
 import com.linguaflow.v2.ApiDtos.HeartbeatResponse;
 import com.linguaflow.v2.ApiDtos.Narration;
@@ -31,6 +40,42 @@ import com.linguaflow.v2.ApiDtos.StartPointEditRequest;
 @Service
 public class LinguaFlowService {
     private final JdbcTemplate db;
+
+    public static class SiteOverlapException extends RuntimeException {
+        public SiteOverlapException(String message) { super(message); }
+    }
+
+    // Straight-line distance in meters, same Haversine calculation as frontend geo.js.
+    private static double distanceBetweenMeters(double lat1, double lon1,
+                                                double lat2, double lon2) {
+        double dLat = Math.toRadians(lat2 - lat1);
+        double dLon = Math.toRadians(lon2 - lon1);
+        double a = Math.pow(Math.sin(dLat / 2), 2)
+                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
+                * Math.pow(Math.sin(dLon / 2), 2);
+        a = Math.max(0, Math.min(1, a));
+        return 6371000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+
+    private void validateSiteGeofence(Integer editingId, SiteEditRequest input) {
+        // Disabled sites do not affect GPS identification.
+        if (!input.active()) return;
+        for (Site other : listSites(false)) {
+            // Editing a site must not conflict with the same site's old location.
+            if (editingId != null && other.siteId() == editingId) continue;
+            double distance = distanceBetweenMeters(
+                    input.latitude(), input.longitude(), other.latitude(), other.longitude());
+            int required = input.radiusMeters() + other.radiusMeters();
+            // 2 circles overlap (including one containing the other) if distance < sum of radii.
+            if (distance < required) {
+                throw new SiteOverlapException(
+                    "Không thể lưu: vùng GPS chồng lấn với địa điểm '" + other.name() +
+                    "'. Khoảng cách giữa hai tâm: " + Math.round(distance) +
+                    " m; cần ít nhất " + required +
+                    " m (tổng bán kính). Hãy đổi tọa độ hoặc giảm bán kính nhận diện.");
+            }
+        }
+    }
     /**
      * Khởi tạo Service, nhận JdbcTemplate do Spring cung cấp
      * để truy vấn và cập nhật cơ sở dữ liệu SQL Server.
@@ -226,6 +271,56 @@ public class LinguaFlowService {
      * phiên demo đang hoạt động, tổng lượt ghé và thống kê theo từng địa điểm.
      * Dữ liệu được tổng hợp trực tiếp từ VisitorSessions và SiteVisits.
      */
+    /**
+     * Thong ke luot ghe SiteVisits theo ngay, trong 1 thang duoc chon.
+     * SQL luu UTC; hien thi ngay theo mui gio Viet Nam (UTC+7).
+     * Khong sua adminStats, heartbeat hay schema.
+     */
+    public MonthlyVisits monthlyVisits(String monthValue) {
+        final YearMonth month;
+        try {
+            if (monthValue == null || !monthValue.matches("[0-9]{4}-(0[1-9]|1[0-2])")) {
+                throw bad("Month must have format YYYY-MM");
+            }
+            month = YearMonth.parse(monthValue);
+        } catch (DateTimeParseException ex) {
+            throw bad("Month must have format YYYY-MM");
+        }
+
+        // Ranh gioi thang tinh theo Asia/Ho_Chi_Minh, chuyen thanh UTC cho dieu kien WHERE.
+        ZoneId vietnam = ZoneId.of("Asia/Ho_Chi_Minh");
+        LocalDateTime utcStart = month.atDay(1).atStartOfDay(vietnam)
+                .withZoneSameInstant(ZoneOffset.UTC).toLocalDateTime();
+        LocalDateTime utcEnd = month.plusMonths(1).atDay(1).atStartOfDay(vietnam)
+                .withZoneSameInstant(ZoneOffset.UTC).toLocalDateTime();
+        DateTimeFormatter sqlDateTime = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
+
+        List<Map<String, Object>> rows = db.queryForList("""
+            SELECT CONVERT(date, DATEADD(HOUR, 7, EnteredAt)) AS VisitDate,
+                   COUNT_BIG(*) AS VisitCount
+            FROM dbo.SiteVisits
+            WHERE EnteredAt >= CONVERT(datetime2, ?, 126)
+              AND EnteredAt < CONVERT(datetime2, ?, 126)
+            GROUP BY CONVERT(date, DATEADD(HOUR, 7, EnteredAt))
+            ORDER BY VisitDate
+            """, utcStart.format(sqlDateTime), utcEnd.format(sqlDateTime));
+
+        Map<String, Long> byDate = new HashMap<>();
+        for (Map<String, Object> row : rows) {
+            String key = ((java.sql.Date) row.get("VisitDate")).toLocalDate().toString();
+            byDate.put(key, ((Number) row.get("VisitCount")).longValue());
+        }
+        List<DailyVisits> days = new ArrayList<>();
+        long total = 0;
+        for (int day = 1; day <= month.lengthOfMonth(); day++) {
+            String date = month.atDay(day).toString();
+            long count = byDate.getOrDefault(date, 0L);
+            days.add(new DailyVisits(date, count));
+            total += count;
+        }
+        return new MonthlyVisits(month.toString(), total, days);
+    }
+
     public AdminStats adminStats() {
         long started = db.queryForObject("SELECT COUNT_BIG(*) FROM dbo.VisitorSessions", Long.class);
         long active = db.queryForObject("""
@@ -270,6 +365,7 @@ public class LinguaFlowService {
     public Site saveSite(Integer id, SiteEditRequest input) {
         int exists = db.queryForObject("SELECT COUNT(*) FROM dbo.Categories WHERE CategoryId=?", Integer.class, input.categoryId());
         if (exists==0) throw bad("Category does not exist");
+        validateSiteGeofence(id, input);
         int siteId;
         if (id==null) {
             siteId = db.queryForObject("""

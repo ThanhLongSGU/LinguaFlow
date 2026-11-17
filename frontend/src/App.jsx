@@ -2,12 +2,13 @@ import { useEffect, useRef, useState } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import MapPanel from './MapPanel.jsx'
 import { api } from './api.js'
-import { identifySite } from './geo.js'
+import { identifySite, distanceMeters } from './geo.js'
+import MonthlyVisitsChart from './MonthlyVisitsChart.jsx'
 
 const SITE_EMPTY = { name:'', categoryId:1, address:'',description:'',imageUrl:'',
   latitude:10.7798, longitude:106.6990, radiusMeters:120, active:true }
 const QR_DEMO = 'HOTEL-CENTER-001'
-const languages = [{code:'vi',label:'Tiếng Việt'},{code:'en',label:'English'},{code:'ja',label:'日本語'}]
+const languages = [{code:'vi',label:'Tiếng Việt'},{code:'en',label:'English'},{code:'ja',label:'日本語'},{code:'ko',label:'한국어 (Tiếng Hàn)'}]
 
 function Topbar({ admin = false }) {
   return <header className="topbar"><a className="brand" href="/"><span className="brand-mark">✦</span>
@@ -175,7 +176,7 @@ function VisitorPage({ code }) {
   }
   async function speak() {
     if(speaking){stopAudio();return}
-    const narration=siteDetails?.narrations?.find(n=>n.language===lang) || siteDetails?.narrations?.[0]
+    const narration=siteDetails?.narrations?.find(n=>n.language===lang) || (lang==='ko' ? null : siteDetails?.narrations?.[0])
     if(!narration){setStatus('Địa điểm chưa có bài thuyết minh.');return}
     setStatus('')
     if(narration.audioUrl){
@@ -189,11 +190,24 @@ function VisitorPage({ code }) {
     }
     if(!('speechSynthesis' in window)) {setStatus('Trình duyệt không hỗ trợ giọng đọc.');return}
     const utt=new SpeechSynthesisUtterance(narration.content)
-    utt.lang=lang==='ja'?'ja-JP':lang==='en'?'en-US':'vi-VN';utt.rate=0.95
+    utt.lang=lang==='ko'?'ko-KR':lang==='ja'?'ja-JP':lang==='en'?'en-US':'vi-VN';utt.rate=0.95
     utt.onend=()=>setSpeaking(false);utt.onerror=()=>setSpeaking(false)
     window.speechSynthesis.cancel();window.speechSynthesis.speak(utt);setSpeaking(true)
   }
-  const narration=siteDetails?.narrations?.find(n=>n.language===lang) || siteDetails?.narrations?.[0]
+  const narration=siteDetails?.narrations?.find(n=>n.language===lang) || (lang==='ko' ? null : siteDetails?.narrations?.[0])
+
+  // Tinh khoang cach duong chim bay den dia diem gan nhat tai trinh duyet.
+  // Chi dung GPS co do chinh xac du de tranh hien so do sai qua lon.
+  const nearestSite = position &&
+    Number.isFinite(position.latitude) && Number.isFinite(position.longitude) &&
+    Number.isFinite(position.accuracy) && position.accuracy <= 150
+    ? sites
+        .filter(site => site.active !== false && site.latitude != null && site.longitude != null &&
+          Number.isFinite(Number(site.latitude)) && Number.isFinite(Number(site.longitude)))
+        .map(site => ({ site, meters: distanceMeters(position, site) }))
+        .filter(item => Number.isFinite(item.meters))
+        .reduce((nearest, item) => !nearest || item.meters < nearest.meters ? item : nearest, null)
+    : null
 
   return <><Topbar/><main className="wrap visitor">
     <div className="page-heading"><div><span className="eyebrow">HÀNH TRÌNH THAM QUAN</span>
@@ -210,6 +224,29 @@ function VisitorPage({ code }) {
         <div className="card map-card"><div className="card-header"><div><h2>Bản đồ khám phá</h2><span className="muted">{gpsState}</span></div>
           <label className="toggle"><input type="checkbox" checked={follow} onChange={e=>setFollow(e.target.checked)}/> Theo vị trí</label></div>
           <MapPanel sites={sites} position={position} currentSiteId={currentSite?.siteId} follow={follow} height={460}/>
+          <div className="gps-coordinates" aria-live="polite">
+            <strong>📍 Tọa độ GPS của khách</strong>
+            {position ? <>
+              <div className="gps-coordinate-values">
+                <span><b>Vĩ độ:</b> {position.latitude.toFixed(6)}</span>
+                <span><b>Kinh độ:</b> {position.longitude.toFixed(6)}</span>
+                <span><b>Sai số GPS:</b> ±{Math.round(position.accuracy)} m</span>
+              </div>
+              {nearestSite && <div className="nearest-site-result">
+                <span className="nearest-site-label">📍 Địa điểm gần nhất{gpsState === 'Đã tạm dừng GPS' ? ' (vị trí cuối)' : ''}</span>
+                <strong>{nearestSite.site.name}</strong>
+                <span className="nearest-site-meters">Cách {Math.round(nearestSite.meters).toLocaleString('vi-VN')} m</span>
+                <span className="fine">Khoảng cách đường chim bay, không phải đường đi thực tế.</span>
+              </div>}
+              {position.accuracy <= 150 && !nearestSite &&
+                <p className="fine">Chưa có địa điểm hợp lệ để tính khoảng cách.</p>}
+              {gpsState === 'Đã tạm dừng GPS' &&
+                <p className="fine">Đây là tọa độ nhận được lần cuối trước khi tạm dừng GPS.</p>}
+              {position.accuracy > 150 &&
+                <p className="fine">Độ chính xác GPS đang thấp; tọa độ chỉ mang tính tham khảo.</p>}
+              {demo && <p className="fine">Tọa độ này lấy từ GPS thiết bị, không phải vị trí mô phỏng.</p>}
+            </> : <p className="fine">Chưa có tọa độ. Nhấn “Bật GPS” và cấp quyền vị trí để xem.</p>}
+          </div>
           <div className="map-actions">
             <button className="button primary" onClick={startGPS} disabled={watcherRef.current!==null}>📍 Bật GPS</button>
             <button className="button secondary" onClick={()=>{stopGPS();setGpsState('Đã tạm dừng GPS');latestFixRef.current=null;updateSite(null); beatRef.current?.(null)}}>Tạm dừng GPS</button>
@@ -253,7 +290,7 @@ function AdminPage() {
   const [editingId,setEditingId] = useState(null)
   const [startForm,setStartForm] = useState({name:'',address:''})
   const [narrationSite,setNarrationSite] = useState(null)
-  const [narrationForm,setNarrationForm] = useState({title:'',vi:'',en:'',ja:''})
+  const [narrationForm,setNarrationForm] = useState({title:'',vi:'',en:'',ja:'',ko:''})
   const [tab,setTab] = useState('overview')
   const credsRef=useRef(credentials)
   useEffect(()=>{credsRef.current=credentials},[credentials])
@@ -276,19 +313,21 @@ function AdminPage() {
   },[credentials])
   async function mutate(run,success) {
     setError('');setNotice('')
-    try{await run();await refresh();setNotice(success)}catch(err){setError(err.message)}
+    try{await run();await refresh();setNotice(success);return true}
+    catch(err){setError(err.message);window.scrollTo({top:0,behavior:'smooth'});return false}
   }
   function editSite(site) {
     setEditingId(site.siteId);setSiteForm({...site});setTab('sites');window.scrollTo({top:0,behavior:'smooth'})
   }
   async function saveSite(e) {
     e.preventDefault()
-    await mutate(()=>api(editingId?`/admin/sites/${editingId}`:'/admin/sites',{
+    const saved = await mutate(()=>api(editingId?`/admin/sites/${editingId}`:'/admin/sites',{
       method:editingId?'PUT':'POST',admin:credentials,
       data:{...siteForm,categoryId:Number(siteForm.categoryId),latitude:Number(siteForm.latitude),
         longitude:Number(siteForm.longitude),radiusMeters:Number(siteForm.radiusMeters)}
     }),editingId?'Đã cập nhật địa điểm':'Đã tạo địa điểm')
-    setEditingId(null);setSiteForm({...SITE_EMPTY})
+    // Keep user input when backend rejects a nested or overlapping GPS zone.
+    if (saved) { setEditingId(null);setSiteForm({...SITE_EMPTY}) }
   }
   async function openNarration(site) {
     setNarrationSite(site);setTab('narration');setError('')
@@ -298,8 +337,9 @@ function AdminPage() {
       setNarrationForm({title:list[0]?.title || `Giới thiệu ${site.name}`,
         vi:list.find(x=>x.language==='vi')?.content || '',
         en:list.find(x=>x.language==='en')?.content || '',
-        ja:list.find(x=>x.language==='ja')?.content || ''})
-    } catch {setNarrationForm({title:`Giới thiệu ${site.name}`,vi:'',en:'',ja:''})}
+        ja:list.find(x=>x.language==='ja')?.content || '',
+        ko:list.find(x=>x.language==='ko')?.content || ''})
+    } catch {setNarrationForm({title:`Giới thiệu ${site.name}`,vi:'',en:'',ja:'',ko:''})}
   }
   if(!credentials)return <><Topbar admin/><main className="login-wrap"><form className="card login" onSubmit={login}>
     <span className="eyebrow">KHU VỰC QUẢN TRỊ</span><h1>Đăng nhập LinguaFlow</h1>
@@ -325,6 +365,7 @@ function AdminPage() {
         <Metric title="Đang hoạt động · 45 giây" number={stats?.activeSessions??'—'} icon="◎"/>
         <Metric title="Tổng lượt ghé địa điểm" number={stats?.totalVisits??'—'} icon="⌖"/>
         <Metric title="Trong đó: phiên demo đang hoạt động" number={stats?.demoActiveSessions??'—'} icon="⚑"/></div>
+      <MonthlyVisitsChart admin={credentials}/>
       <div className="card"><div className="card-header"><div><h2>Bản đồ phiên hoạt động theo địa điểm</h2>
         <p className="fine">Tự động cập nhật mỗi 5 giây. Marker là tọa độ địa điểm cố định, không phải tọa độ khách.</p></div>
         <button className="button secondary small" onClick={()=>refresh().catch(e=>setError(e.message))}>Làm mới</button></div>
@@ -376,10 +417,10 @@ function AdminPage() {
       <div className="card"><h2>{narrationSite?`Nội dung: ${narrationSite.name}`:'Chọn một địa điểm'}</h2>
         {narrationSite&&<form className="stack" onSubmit={e=>{e.preventDefault();mutate(()=>api(`/admin/sites/${narrationSite.siteId}/narration`,{method:'PUT',admin:credentials,data:narrationForm}),'Đã lưu thuyết minh')}}>
           <label className="field">Tiêu đề<input required value={narrationForm.title} onChange={e=>setNarrationForm({...narrationForm,title:e.target.value})}/></label>
-          {[['vi','Tiếng Việt · gốc'],['en','English'],['ja','日本語']].map(([k,l])=><label className="field" key={k}>{l}
+          {[['vi','Tiếng Việt · gốc'],['en','English'],['ja','日本語'],['ko','한국어 · Tiếng Hàn']].map(([k,l])=><label className="field" key={k}>{l}
             <textarea required={k==='vi'} rows="4" value={narrationForm[k]} onChange={e=>setNarrationForm({...narrationForm,[k]:e.target.value})}/></label>)}
           <button className="button primary">Lưu nội dung</button>
-          <p className="fine">Phát audio demo qua Web Speech API; nếu thêm AudioUrl vào SQL, trang khách sẽ ưu tiên file âm thanh.</p>
+          <p className="fine">Bản dịch tiếng Hàn cần được nhập sẵn; hệ thống chưa tự dịch. Nếu không có file MP3, trang khách sẽ sử dụng giọng đọc tiếng Hàn của thiết bị khi được hỗ trợ.</p>
         </form>}</div></div>}
   </main></>
 }

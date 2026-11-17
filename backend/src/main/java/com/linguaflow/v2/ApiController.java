@@ -13,6 +13,13 @@ public class ApiController {
     private final LinguaFlowService service;
     public ApiController(LinguaFlowService service) { this.service = service; }
 
+    // Report geofence conflicts as JSON so the React admin form can show the reason.
+    @ExceptionHandler(LinguaFlowService.SiteOverlapException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public Map<String, String> siteOverlap(LinguaFlowService.SiteOverlapException ex) {
+        return Map.of("message", ex.getMessage());
+    }
+
     @GetMapping("/public/health")
     public Map<String,String> health() { return Map.of("status","ok","project","LinguaFlowV2"); }
 
@@ -51,6 +58,12 @@ public class ApiController {
 
     @GetMapping("/admin/stats")
     public AdminStats stats() { return service.adminStats(); }
+
+    // Bieu do thong ke theo ngay cua mot thang, yeu cau quyen ADMIN nhu cac API /admin khac.
+    @GetMapping("/admin/visits/monthly")
+    public MonthlyVisits monthlyVisits(@RequestParam String month) {
+        return service.monthlyVisits(month);
+    }
 
     @GetMapping("/admin/sites")
     public List<Site> adminSites() { return service.listSites(true); }
