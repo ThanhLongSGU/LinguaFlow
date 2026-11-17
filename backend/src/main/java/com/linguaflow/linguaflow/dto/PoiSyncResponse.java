@@ -12,6 +12,7 @@ public record PoiSyncResponse(
                         Integer siteId,
                         String name,
                         Integer categoryId,
+                        Integer regionId,
                         String description,
                         BigDecimal latitude,
                         BigDecimal longitude,
@@ -20,6 +21,6 @@ public record PoiSyncResponse(
                         List<PoiTranslation> translations) {
         }
 
-        public record PoiTranslation(String languageCode, String audioUrl) {
+        public record PoiTranslation(String languageCode, String content, String audioUrl) {
         }
 }

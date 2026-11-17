@@ -1,8 +1,11 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { getTouristSiteByQr, resolveAssetUrl, type TouristSiteDetail, type TranslationItem } from "../../services/api";
+import { useLanguage } from "../../contexts/LanguageContext";
+import LanguageSelector from "../../components/LanguageSelector";
 
 function VisitorPage() {
+  const { narrationLanguage, t } = useLanguage();
   const { qrCodeValue = "" } = useParams();
   const [site, setSite] = useState<TouristSiteDetail | null>(null);
   const [selectedTranslation, setSelectedTranslation] = useState<TranslationItem | null>(null);
@@ -21,28 +24,41 @@ function VisitorPage() {
       .then((result) => {
         setSite(result);
         setSelectedTranslation(
-          result.availableTranslations.find((item) => item.isDefault) ?? result.availableTranslations[0] ?? null,
+          result.translations.find((item) => item.languageCode.toLowerCase() === narrationLanguage) ??
+            result.translations.find((item) => item.languageCode.toLowerCase() === "vi") ??
+            result.translations[0] ??
+            null,
         );
       })
       .catch((requestError: unknown) => {
         if (requestError instanceof DOMException && requestError.name === "AbortError") {
           return;
         }
-        setError(requestError instanceof Error ? requestError.message : "Đã xảy ra lỗi khi tải dữ liệu.");
+        setError(requestError instanceof Error ? requestError.message : t("visitor", "loadError"));
       })
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false);
       });
 
     return () => controller.abort();
-  }, [qrCodeValue]);
+  }, [qrCodeValue, narrationLanguage]);
+
+  useEffect(() => {
+    if (!site) return;
+    setSelectedTranslation(
+      site.translations.find((item) => item.languageCode.toLowerCase() === narrationLanguage) ??
+        site.translations.find((item) => item.languageCode.toLowerCase() === "vi") ??
+        site.translations[0] ??
+        null,
+    );
+  }, [narrationLanguage, site]);
 
   if (loading) {
     return (
       <main className="visitor-shell" aria-busy="true">
         <div className="loading-view">
           <span className="loading-mark" aria-hidden="true" />
-          <p>Đang tải thông tin điểm đến...</p>
+          <p>{t("visitor", "loading")}</p>
         </div>
       </main>
     );
@@ -59,8 +75,8 @@ function VisitorPage() {
         </header>
         <section className="message-view" role="alert">
           <span className="message-code">QR / NOT FOUND</span>
-          <h1>Không tìm thấy điểm đến</h1>
-          <p>{error ?? "Mã QR không hợp lệ hoặc địa điểm hiện không khả dụng."}</p>
+          <h1>{t("visitor", "notFound")}</h1>
+          <p>{error ?? t("visitor", "invalidQr")}</p>
         </section>
       </main>
     );
@@ -74,9 +90,10 @@ function VisitorPage() {
         </span>
         <span className="brand-name">LinguaFlow</span>
         <Link className="map-nav-link" to="/map">
-          Bản đồ GPS
+          {t("visitor", "mapLink")}
         </Link>
-        <span className="topbar-note">AUDIO GUIDE</span>
+        <LanguageSelector />
+        <span className="topbar-note">{t("visitor", "audioGuide")}</span>
       </header>
 
       <article className="site-page">
@@ -90,7 +107,7 @@ function VisitorPage() {
           )}
           <div className="hero-shade" />
           <div className="hero-copy">
-            <span className="eyebrow">ĐIỂM ĐẾN · {site.siteId}</span>
+            <span className="eyebrow">{t("visitor", "destination")} · {site.siteId}</span>
             <h1>{site.name}</h1>
             {site.address && <p className="site-address">{site.address}</p>}
           </div>
@@ -98,16 +115,16 @@ function VisitorPage() {
 
         <section className="guide-content">
           <div className="description-column">
-            <span className="section-label">GIỚI THIỆU</span>
-            <p className="site-description">{site.description || "Chưa có nội dung giới thiệu cho địa điểm này."}</p>
+            <span className="section-label">{t("visitor", "introduction")}</span>
+            <p className="site-description">{site.description || t("visitor", "noDescription")}</p>
           </div>
 
-          <aside className="audio-column" aria-label="Thuyết minh âm thanh">
-            <span className="section-label">NGHE THUYẾT MINH</span>
-            {site.availableTranslations.length > 0 ? (
+          <aside className="audio-column" aria-label={t("visitor", "listenNarration")}>
+            <span className="section-label">{t("visitor", "listenNarration")}</span>
+            {site.translations.length > 0 ? (
               <>
-                <div className="language-list" role="group" aria-label="Chọn ngôn ngữ">
-                  {site.availableTranslations.map((translation) => (
+                <div className="language-list" role="group" aria-label={t("visitor", "chooseLanguage")}>
+                  {site.translations.map((translation) => (
                     <button
                       className={`language-button${selectedTranslation?.languageCode === translation.languageCode ? " is-selected" : ""}`}
                       key={translation.languageCode}
@@ -125,16 +142,16 @@ function VisitorPage() {
                     <p className="translation-content">{selectedTranslation.content}</p>
                     {selectedTranslation.audioUrl ? (
                       <audio controls preload="none" src={resolveAssetUrl(selectedTranslation.audioUrl)}>
-                        Trình duyệt của bạn không hỗ trợ phát audio.
+                        {t("visitor", "browserAudioUnsupported")}
                       </audio>
                     ) : (
-                      <p className="audio-unavailable">Audio chưa sẵn sàng.</p>
+                      <p className="audio-unavailable">{t("visitor", "audioUnavailable")}</p>
                     )}
                   </div>
                 )}
               </>
             ) : (
-              <p className="audio-unavailable">Chưa có bản thuyết minh cho địa điểm này.</p>
+              <p className="audio-unavailable">{t("visitor", "noNarration")}</p>
             )}
           </aside>
         </section>

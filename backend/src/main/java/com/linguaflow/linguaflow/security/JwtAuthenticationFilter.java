@@ -22,6 +22,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtUtils jwtUtils;
     private final DatabaseUserDetailsService userDetailsService;
+    private final AdminSessionService adminSessionService;
 
     @Override
     protected void doFilterInternal(
@@ -37,6 +38,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             if (jwtUtils.validateToken(token)) {
                 try {
                     String username = jwtUtils.extractUsername(token);
+                    if (!adminSessionService.touchIfActive(username)) {
+                        SecurityContextHolder.clearContext();
+                        filterChain.doFilter(request, response);
+                        return;
+                    }
                     UserDetails userDetails = userDetailsService.loadUserByUsername(username);
                     var authentication = new UsernamePasswordAuthenticationToken(
                             userDetails,

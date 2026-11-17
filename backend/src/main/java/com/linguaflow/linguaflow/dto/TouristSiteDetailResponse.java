@@ -15,6 +15,7 @@ import java.util.List;
 public class TouristSiteDetailResponse {
 
     private Integer siteId;
+    private Integer regionId;
     private String name;
     private String description;
     private String address;

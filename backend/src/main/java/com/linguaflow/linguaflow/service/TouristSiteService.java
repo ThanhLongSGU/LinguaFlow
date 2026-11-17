@@ -5,10 +5,12 @@ import com.linguaflow.linguaflow.dto.TouristSiteDetailResponse;
 import com.linguaflow.linguaflow.dto.TouristSiteDTO;
 import com.linguaflow.linguaflow.entity.Category;
 import com.linguaflow.linguaflow.entity.QRCode;
+import com.linguaflow.linguaflow.entity.Region;
 import com.linguaflow.linguaflow.entity.TouristSite;
 import com.linguaflow.linguaflow.entity.User;
 import com.linguaflow.linguaflow.repository.CategoryRepository;
 import com.linguaflow.linguaflow.repository.QRCodeRepository;
+import com.linguaflow.linguaflow.repository.RegionRepository;
 import com.linguaflow.linguaflow.repository.NarrationRepository;
 import com.linguaflow.linguaflow.repository.TouristSiteRepository;
 import com.linguaflow.linguaflow.repository.UserRepository;
@@ -29,6 +31,7 @@ public class TouristSiteService {
         private final CategoryRepository categoryRepository;
         private final NarrationRepository narrationRepository;
         private final UserRepository userRepository;
+        private final RegionRepository regionRepository;
 
         @Transactional(readOnly = true)
         @Cacheable(value = "qr_sites", key = "#qrCodeValue")
@@ -56,10 +59,13 @@ public class TouristSiteService {
                                                 "Category not found with id: " + request.categoryId()));
                 User createdBy = userRepository.findByUsername("admin")
                                 .orElseThrow(() -> new EntityNotFoundException("Super Admin account not found"));
+                Region region = regionRepository.findAll().stream().findFirst()
+                                .orElseThrow(() -> new EntityNotFoundException("Region not found"));
 
                 TouristSite touristSite = TouristSite.builder()
                                 .name(request.name())
                                 .category(category)
+                                .region(region)
                                 .description(request.description())
                                 .address(request.address())
                                 .city(request.city())

@@ -16,9 +16,6 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
-
 import java.time.LocalDateTime;
 
 @Entity
@@ -51,17 +48,36 @@ public class AiTranslationTask {
     @Column(name = "Status", nullable = false, length = 20, columnDefinition = "VARCHAR(20)")
     private String status;
 
+    @Column(name = "TaskSource", nullable = false, length = 20)
+    @Builder.Default
+    private String taskSource = "ADMIN";
+
+    @Column(name = "SourceContentHash", length = 64)
+    private String sourceContentHash;
+
     @Column(name = "ErrorMessage", columnDefinition = "NVARCHAR(MAX)")
     private String errorMessage;
 
     @Column(name = "RetryCount", nullable = false)
     private Integer retryCount;
 
-    @CreationTimestamp
-    @Column(name = "CreatedAt", nullable = false, updatable = false)
+    @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    @UpdateTimestamp
-    @Column(name = "UpdatedAt")
+    @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
+
+    @jakarta.persistence.PrePersist
+    protected void onCreate() {
+        LocalDateTime now = LocalDateTime.now();
+        if (createdAt == null) {
+            createdAt = now;
+        }
+        updatedAt = now;
+    }
+
+    @jakarta.persistence.PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
+    }
 }

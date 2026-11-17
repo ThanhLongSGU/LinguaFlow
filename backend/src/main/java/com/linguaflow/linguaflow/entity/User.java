@@ -8,6 +8,8 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -16,6 +18,7 @@ import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 import java.util.ArrayList;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Entity
@@ -46,10 +49,36 @@ public class User {
     @Column(name = "IsActive", nullable = false)
     private Boolean active;
 
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+
+    @Column(name = "updated_at", nullable = false)
+    private LocalDateTime updatedAt;
+
+    @Column(name = "FailedLoginAttempts", nullable = false)
+    private Integer failedLoginAttempts;
+
+    @Column(name = "LockedUntil")
+    private LocalDateTime lockedUntil;
+
     @OneToMany(mappedBy = "createdBy", fetch = FetchType.LAZY)
     @JsonIgnore
     @ToString.Exclude
     @EqualsAndHashCode.Exclude
     @Builder.Default
     private List<TouristSite> createdSites = new ArrayList<>();
+
+    @PrePersist
+    protected void onCreate() {
+        LocalDateTime now = LocalDateTime.now();
+        if (createdAt == null) {
+            createdAt = now;
+        }
+        updatedAt = now;
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
+    }
 }
