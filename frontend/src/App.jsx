@@ -321,7 +321,7 @@ function AdminPage() {
       ['overview','Tổng quan'],['sites','Địa điểm GPS'],['starts','Điểm khởi hành & QR'],['narration','Thuyết minh']
     ].map(([id,label])=><button key={id} className={tab===id?'tab active':'tab'} onClick={()=>setTab(id)}>{label}</button>)}</div>
     {tab==='overview'&&<>
-      <div className="metric-grid"><Metric title="Phiên đã bắt đầu" number={stats?.totalStarted??'—'} icon="◈"/>
+      <div className="metric-grid"><Metric title="Tổng số phiên đang hoạt động" number={stats?.activeSessions??'—'} icon="◈"/>
         <Metric title="Đang hoạt động · 45 giây" number={stats?.activeSessions??'—'} icon="◎"/>
         <Metric title="Tổng lượt ghé địa điểm" number={stats?.totalVisits??'—'} icon="⌖"/>
         <Metric title="Trong đó: phiên demo đang hoạt động" number={stats?.demoActiveSessions??'—'} icon="⚑"/></div>
